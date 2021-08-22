@@ -1,6 +1,6 @@
 use crate::args::Destination;
 use crate::telegram::Telegram;
-use serialport::{new, DataBits, Parity, SerialPort, SerialPortBuilder, StopBits};
+use serialport::{new, DataBits, Parity, StopBits};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, DestinationError>;
