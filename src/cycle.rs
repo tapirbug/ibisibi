@@ -1,9 +1,9 @@
 use crate::args::Cycle;
 use crate::telegram::Telegram;
 use serialport::{new, DataBits, Parity, StopBits};
-use thiserror::Error;
 use std::thread::sleep;
 use std::time::Duration;
+use thiserror::Error;
 
 type Result<T> = std::result::Result<T, CycleError>;
 
