@@ -1,4 +1,5 @@
 mod args;
+mod cycle;
 mod destination;
 mod list;
 mod telegram;
@@ -10,5 +11,6 @@ fn main() -> Result<(), String> {
         args::Invocation::Destination(destination) => {
             destination::destination(destination).map_err(|e| format!("{}", e))
         }
+        args::Invocation::Cycle(cycle) => cycle::cycle(cycle).map_err(|e| format!("{}", e)),
     }
 }
