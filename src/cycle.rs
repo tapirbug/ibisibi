@@ -1,4 +1,5 @@
-use crate::args::Cycle;
+use crate::args::{Cycle, Destination};
+use crate::destination::{destination, DestinationError};
 use crate::telegram::Telegram;
 use serialport::{new, DataBits, Parity, StopBits};
 use std::thread::sleep;
@@ -7,7 +8,9 @@ use thiserror::Error;
 
 type Result<T> = std::result::Result<T, CycleError>;
 
-pub fn cycle(options: Cycle) -> Result<()> {
+const RETRY_INTERVAL: Duration = Duration::from_secs(5);
+
+pub fn cycle(options: &Cycle) -> Result<()> {
     assert!(options.interval_secs > 1.0, "Expected at least 1s delay");
     assert!(
         options.indexes.len() >= 1,
@@ -23,13 +26,6 @@ pub fn cycle(options: Cycle) -> Result<()> {
         assert!(*idx < std::u16::MAX.into());
     }
 
-    let mut serial = new(&options.serial, 1200)
-        .data_bits(DataBits::Seven)
-        .stop_bits(StopBits::Two)
-        .parity(Parity::Even)
-        .open()
-        .map_err(|e| CycleError::serial(e, &options.serial))?;
-
     let indexes = options
         .indexes
         .iter()
@@ -40,11 +36,19 @@ pub fn cycle(options: Cycle) -> Result<()> {
     let sleep_duration = Duration::from_secs_f64(options.interval_secs);
 
     for destination_index in indexes {
-        let telegram = Telegram::destination(destination_index as u16);
-        serial
-            .write(telegram.as_bytes())
-            .map_err(|e| CycleError::io(e, &options.serial))?;
-
+        let destination_args = Destination {
+            index: destination_index as u16,
+            serial: options.serial.clone()
+        };
+        while let Err(err) = destination(&destination_args) {
+            eprintln!(
+                "error: could not switch to destination {dest}, reason: {reason}, retry after {interval:?}",
+                dest = destination_index,
+                reason = err,
+                interval = RETRY_INTERVAL
+            );
+            sleep(RETRY_INTERVAL);
+        }
         sleep(sleep_duration);
     }
 
@@ -54,30 +58,6 @@ pub fn cycle(options: Cycle) -> Result<()> {
 
 #[derive(Error, Debug)]
 pub enum CycleError {
-    #[error("Could not send command to switch destination by index to port: {port}, due to I/O error: {source}")]
-    IO {
-        source: std::io::Error,
-        port: String,
-    },
-    #[error("Could not open serial port connection to: {port}, due to error: {source}")]
-    Serial {
-        source: serialport::Error,
-        port: String,
-    },
-}
-
-impl CycleError {
-    fn io(source: std::io::Error, port: &str) -> Self {
-        Self::IO {
-            source,
-            port: port.into(),
-        }
-    }
-
-    fn serial(source: serialport::Error, port: &str) -> Self {
-        Self::Serial {
-            source,
-            port: port.into(),
-        }
-    }
+    #[error("{0}")]
+    Destination(#[from] DestinationError),
 }

@@ -5,7 +5,7 @@ use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, DestinationError>;
 
-pub fn destination(destination: Destination) -> Result<()> {
+pub fn destination(destination: &Destination) -> Result<()> {
     let mut serial = new(&destination.serial, 1200)
         .data_bits(DataBits::Seven)
         .stop_bits(StopBits::Two)
