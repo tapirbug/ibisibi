@@ -2,7 +2,9 @@ mod args;
 mod cycle;
 mod destination;
 mod list;
+mod plan;
 mod range;
+mod slot;
 mod telegram;
 
 fn main() -> Result<(), String> {

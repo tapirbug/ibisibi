@@ -9,6 +9,6 @@ WantedBy=multi-user.target
 [Service]
 User=pi
 Type=simple
-ExecStart=/home/pi/bin/ibisibi cycle 0-1 --serial /dev/ttyUSB0 --interval-secs 8
+ExecStart=/home/pi/bin/ibisibi cycle 0@2021-09-09T00:00:00/2021-09-10T00:00:00 2@2021-09-09T20:00:00/2021-09-09T21:00:00 0@2021-09-10T00:00:00/2021-09-14T00:00:00 4@2021-09-10T17:00:00/2021-09-10T21:00:00 0@2021-09-10T00:00:00/2021-09-14T00:00:00 5@2021-09-10T21:00:00/2021-09-10T23:00:00 --serial /dev/ttyUSB0 --interval-secs 8 --lookahead 12
 Restart=always
 RestartSec=10

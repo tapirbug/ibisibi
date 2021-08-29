@@ -101,7 +101,7 @@ fn parse_num_or_zero_when_empty(source: &str) -> Result<usize, ParseRangeError> 
     })
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ParseRangeError {
     #[error("Could not parse `{offending_input}` as a number or number range")]
     Malformed { offending_input: String },
