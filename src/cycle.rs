@@ -30,7 +30,7 @@ pub fn cycle(options: &Cycle) -> Result<()> {
         .indexes
         .iter()
         .cloned()
-        .chain((options.from)..(options.to))
+        .chain((options.from)..=(options.to))
         .cycle();
 
     let sleep_duration = Duration::from_secs_f64(options.interval_secs);
