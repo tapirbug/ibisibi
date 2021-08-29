@@ -9,6 +9,3 @@ edition = "2018"
 argh = "0.1.5"
 serialport = "4.0.1"
 thiserror = "1.0.26"
-
-[target.arm-unknown-linux-gnueabihf]
-linker = "/home/krachzack/Development/rpi-newer-crosstools/x64-gcc-6.3.1/arm-rpi-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc"
