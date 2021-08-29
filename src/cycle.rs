@@ -13,7 +13,7 @@ const RETRY_INTERVAL: Duration = Duration::from_secs(5);
 pub fn cycle(options: &Cycle) -> Result<()> {
     assert!(options.interval_secs > 1.0, "Expected at least 1s delay");
     assert!(
-        options.indexes.len() >= 1,
+        options.indexes.len() >= 1 || options.from < options.to,
         "Expected at least one destination index"
     );
     assert!(
