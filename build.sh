@@ -63,7 +63,7 @@ function copy_assets {
 
 function generate_source_link {
     echo "The source code is publicly hosted at GitHub:
-https://github.com/krachzack/fernspielapparat" > $RELEASE_DIR/SOURCE
+https://github.com/tapirbug/ibisibi" > $RELEASE_DIR/SOURCE
 }
 
 cargo build $CARGO_ARGS && \
