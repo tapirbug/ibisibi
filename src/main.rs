@@ -2,6 +2,7 @@ mod args;
 mod cycle;
 mod destination;
 mod list;
+mod range;
 mod telegram;
 
 fn main() -> Result<(), String> {

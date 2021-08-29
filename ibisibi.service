@@ -9,6 +9,6 @@ WantedBy=multi-user.target
 [Service]
 User=pi
 Type=simple
-ExecStart=/home/pi/bin/ibisibi cycle --from 0 --to 1 --serial /dev/ttyUSB0 --interval-secs 8
+ExecStart=/home/pi/bin/ibisibi cycle 0-1 --serial /dev/ttyUSB0 --interval-secs 8
 Restart=always
 RestartSec=10

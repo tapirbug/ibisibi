@@ -1,3 +1,4 @@
+use crate::range::Range;
 use argh::FromArgs;
 
 /// Write IBIS telegrams to serial ports or list available serial ports.
@@ -41,19 +42,36 @@ pub struct Destination {
 #[derive(FromArgs)]
 #[argh(subcommand, name = "cycle")]
 pub struct Cycle {
-    /// indexes of the destinations to loop through, in range 0-999.
+    /// indexes or index ranges of the destinations to loop through, e.g. 8 or 0-5.
+    ///
+    /// Must be in range 0 to 999.
     #[argh(positional)]
-    pub indexes: Vec<usize>,
+    pub indexes: Vec<Range>,
     /// interval to wait before switching to the next destination.
     #[argh(option, short = 'i', default = "5.0")]
     pub interval_secs: f64,
     /// serial port to use, e.g. /dev/ttyUSB0 on Linux, or COM5 on Windows.
     #[argh(option, short = 's')]
     pub serial: String,
-    /// first destination to show and start of the cycle
-    #[argh(option, short = 'f', default = "0")]
-    pub from: usize,
-    /// last destination to show and start of the cycle
-    #[argh(option, short = 't', default = "0")]
-    pub to: usize,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn number_ranges() {
+        let expected_serial = "/dev/ttyUSB0";
+        let args = ["cycle", "0", "0-5", "-s", expected_serial];
+        let args: TopLevel = argh::FromArgs::from_args(&["ibisibi"], &args).unwrap();
+        match args.invocation {
+            Invocation::Cycle(Cycle {
+                indexes, serial, ..
+            }) => {
+                assert_eq!(indexes, vec!["0".parse().unwrap(), "0-5".parse().unwrap()]);
+                assert_eq!(serial, expected_serial);
+            }
+            _ => panic!("unexpected subcommand"),
+        }
+    }
 }
