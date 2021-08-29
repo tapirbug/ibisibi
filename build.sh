@@ -21,6 +21,16 @@ VERSION=$(echo "$METADATA" | sed -n '2p')
 HOST_SYSTEM_NAME=$(uname | sed -e 's/\(.*\)/\L\1/')    # lower-case name like "linux"
 HOST_SYSTEM_ARCH=$(uname -m | sed -e 's/\(.*\)/\L\1/') # lower-case, e.g. "x86_64"
 
+# Bring cross-compile toolchain into path
+PATH="$PATH:$HOME/Development/rpi-newer-crosstools/x64-gcc-6.3.1/arm-rpi-linux-gnueabihf/bin/"
+
+# When cross-compoiling serialport on linux, help the build script
+# find the library for cross-compiling.
+# See: https://github.com/dcuddeback/libudev-sys#cross-compiling
+export PKG_CONFIG_SYSROOT_DIR="/home/krachzack/Development/vendor/arm-unknown-linux-gnueabihf/libudev"
+export PKG_CONFIG_LIBDIR="${PKG_CONFIG_SYSROOT_DIR}/usr/lib/pkgconfig:${PKG_CONFIG_SYSROOT_DIR}/usr/share/pkgconfig:${PKG_CONFIG_SYSROOT_DIR}/usr/lib/arm-linux-gnueabihf/pkgconfig"
+export PKG_CONFIG_ALLOW_CROSS=1
+
 CARGO_ARGS="--release"
 if [ -z "$1" ]
 then
