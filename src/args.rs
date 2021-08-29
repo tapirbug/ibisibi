@@ -30,6 +30,9 @@ pub struct Destination {
     /// index of the destination to set, in range 0-999.
     #[argh(positional)]
     pub index: u16,
+    /// optional line number, in range 1-999.
+    #[argh(option, short = 'l')]
+    pub line: Option<u16>,
     /// serial port to use, e.g. /dev/ttyUSB0 on Linux, or COM5 on Windows.
     #[argh(option, short = 's')]
     pub serial: String,

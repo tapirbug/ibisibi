@@ -31,10 +31,12 @@ pub fn cycle(options: &Cycle) -> Result<()> {
             }
         }
 
+        let line = destination_index.line();
         let range = destination_index.range();
         for destination_index in range.iter() {
             let destination_args = Destination {
                 index: destination_index as u16,
+                line,
                 serial: options.serial.clone(),
             };
             while let Err(err) = destination(&destination_args) {

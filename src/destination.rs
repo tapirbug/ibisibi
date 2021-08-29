@@ -13,10 +13,16 @@ pub fn destination(destination: &Destination) -> Result<()> {
         .open()
         .map_err(|e| DestinationError::serial(e, &destination.serial))?;
 
-    let telegram = Telegram::destination(destination.index);
+    if let Some(line) = destination.line {
+        let line_telegram = Telegram::line(line);
+        serial
+            .write(line_telegram.as_bytes())
+            .map_err(|e| DestinationError::io(e, &destination.serial))?;
+    }
 
+    let destination_telegram = Telegram::destination(destination.index);
     serial
-        .write(telegram.as_bytes())
+        .write(destination_telegram.as_bytes())
         .map_err(|e| DestinationError::io(e, &destination.serial))?;
 
     Ok(())
