@@ -108,11 +108,11 @@ mod test {
         match args.invocation {
             Invocation::Cycle(Cycle { plan, .. }) => {
                 assert_eq!(plan[0].destinations(), vec!["0".parse().unwrap()]);
-                assert!(plan[0].slot().is_none());
+                assert!(plan[0].slots().is_empty());
                 assert_eq!(plan[1].destinations(), vec!["2-3".parse().unwrap()]);
                 assert_eq!(
-                    plan[1].slot(),
-                    Some("2021-09-09T20:00:00/2021-09-09T21:00:00".parse().unwrap())
+                    plan[1].slots(),
+                    &["2021-09-09T20:00:00/2021-09-09T21:00:00".parse().unwrap()]
                 );
                 assert_eq!(plan.len(), 2)
             }

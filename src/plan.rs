@@ -9,7 +9,8 @@ use thiserror::Error;
 pub struct Plan {
     line: Option<u16>,
     destinations: Vec<Range>,
-    slot: Option<Slot>,
+    #[serde(default)]
+    slots: Vec<Slot>,
 }
 
 impl Plan {
@@ -20,7 +21,7 @@ impl Plan {
             destinations: vec![range_str
                 .parse()
                 .expect("could not parse range for test plan")],
-            slot: None,
+            slots: vec![],
         }
     }
 
@@ -31,11 +32,9 @@ impl Plan {
             destinations: vec![range_str
                 .parse()
                 .expect("could not parse range for test plan")],
-            slot: Some(
-                slot_str
-                    .parse()
-                    .expect("could not parse time range for test plan"),
-            ),
+            slots: vec![slot_str
+                .parse()
+                .expect("could not parse time range for test plan")],
         }
     }
 
@@ -47,8 +46,8 @@ impl Plan {
         &self.destinations[..]
     }
 
-    pub fn slot(&self) -> Option<Slot> {
-        self.slot
+    pub fn slots(&self) -> &[Slot] {
+        &self.slots[..]
     }
 }
 
@@ -75,12 +74,12 @@ impl FromStr for Plan {
         };
 
         let destinations = vec![range.parse()?]; // unwrap is safe because we checked for empty above
-        let slot = match tokens.next() {
+        let slots = match tokens.next() {
             Some(scheduled_slot) => {
                 let slot: Slot = scheduled_slot.parse()?;
-                Some(slot)
+                vec![slot]
             }
-            None => None,
+            None => vec![],
         };
 
         if tokens.next().is_some() {
@@ -90,7 +89,7 @@ impl FromStr for Plan {
         Ok(Plan {
             line,
             destinations,
-            slot,
+            slots,
         })
     }
 }
@@ -131,7 +130,7 @@ mod test {
             Plan {
                 line: Some(1),
                 destinations: vec!["0-10".parse().unwrap()],
-                slot: Some("2020-01-01T00:00:00/2020-01-01T00:00:00".parse().unwrap())
+                slots: vec!["2020-01-01T00:00:00/2020-01-01T00:00:00".parse().unwrap()]
             }
         );
     }
@@ -144,7 +143,7 @@ mod test {
             Plan {
                 line: Some(1),
                 destinations: vec!["0".parse().unwrap()],
-                slot: None
+                slots: vec![]
             }
         );
     }
@@ -159,7 +158,7 @@ mod test {
             Plan {
                 line: None,
                 destinations: vec!["0-10".parse().unwrap()],
-                slot: Some("2020-01-01T00:00:00/2020-01-01T00:00:00".parse().unwrap())
+                slots: vec!["2020-01-01T00:00:00/2020-01-01T00:00:00".parse().unwrap()]
             }
         )
     }
@@ -172,7 +171,7 @@ mod test {
             Plan {
                 line: None,
                 destinations: vec!["0".parse().unwrap()],
-                slot: None
+                slots: vec![]
             }
         )
     }

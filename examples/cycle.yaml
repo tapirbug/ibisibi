@@ -7,9 +7,10 @@ cycle:
   plan:
     # ROBOEXOTICA (shown every day)
     - destinations:
-      - 0
+        - 0
     # 18:00 - 24:00 Exhibition
     - destinations:
         - 6
-      slot: 2021-09-09T18:00:00/2021-09-10T00:00:00
+      slots:
+        - 2021-09-09T18:00:00/2021-09-10T00:00:00
 
