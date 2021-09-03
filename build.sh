@@ -58,7 +58,8 @@ function clean {
 function copy_assets {
     cp AUTHORS.md $RELEASE_DIR && \
     cp LICENSE $RELEASE_DIR && \
-    cp README.md $RELEASE_DIR
+    cp README.md $RELEASE_DIR && \
+    cp -r examples $RELEASE_DIR
 }
 
 function generate_source_link {
