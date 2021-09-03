@@ -59,6 +59,7 @@ function copy_assets {
     cp AUTHORS.md $RELEASE_DIR && \
     cp LICENSE $RELEASE_DIR && \
     cp README.md $RELEASE_DIR && \
+    cp install.sh $RELEASE_DIR && \
     cp -r examples $RELEASE_DIR
 }
 
@@ -78,4 +79,5 @@ generate_source_link && \
 echo "Writing compressed tarball $RELEASE_TAR ..." && \
 cd release && \
 tar -zcf $RELEASE_TAR $RELEASE_DIR_NAME && \
-cd ..
+cd .. && \
+echo $RELEASE_DIR_NAME
