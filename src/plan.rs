@@ -1,23 +1,50 @@
 use crate::range::{ParseRangeError, Range};
 use crate::slot::{ParseSlotError, Slot};
+use serde::Deserialize;
 use std::str::FromStr;
 use thiserror::Error;
 
 /// A range with an optinal associated time range.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 pub struct Plan {
     line: Option<u16>,
-    range: Range,
+    destinations: Vec<Range>,
     slot: Option<Slot>,
 }
 
 impl Plan {
+    #[cfg(test)]
+    pub fn range(range_str: &str) -> Plan {
+        Plan {
+            line: None,
+            destinations: vec![range_str
+                .parse()
+                .expect("could not parse range for test plan")],
+            slot: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn range_start_end(range_str: &str, slot_str: &str) -> Plan {
+        Plan {
+            line: None,
+            destinations: vec![range_str
+                .parse()
+                .expect("could not parse range for test plan")],
+            slot: Some(
+                slot_str
+                    .parse()
+                    .expect("could not parse time range for test plan"),
+            ),
+        }
+    }
+
     pub fn line(&self) -> Option<u16> {
         self.line
     }
 
-    pub fn range(&self) -> Range {
-        self.range
+    pub fn destinations(&self) -> &[Range] {
+        &self.destinations[..]
     }
 
     pub fn slot(&self) -> Option<Slot> {
@@ -47,7 +74,7 @@ impl FromStr for Plan {
             }
         };
 
-        let range: Range = range.parse()?; // unwrap is safe because we checked for empty above
+        let destinations = vec![range.parse()?]; // unwrap is safe because we checked for empty above
         let slot = match tokens.next() {
             Some(scheduled_slot) => {
                 let slot: Slot = scheduled_slot.parse()?;
@@ -60,7 +87,11 @@ impl FromStr for Plan {
             return Err(ParsePlanError::too_much(source));
         }
 
-        Ok(Plan { line, range, slot })
+        Ok(Plan {
+            line,
+            destinations,
+            slot,
+        })
     }
 }
 
@@ -99,7 +130,7 @@ mod test {
             input,
             Plan {
                 line: Some(1),
-                range: "0-10".parse().unwrap(),
+                destinations: vec!["0-10".parse().unwrap()],
                 slot: Some("2020-01-01T00:00:00/2020-01-01T00:00:00".parse().unwrap())
             }
         );
@@ -112,7 +143,7 @@ mod test {
             input,
             Plan {
                 line: Some(1),
-                range: "0".parse().unwrap(),
+                destinations: vec!["0".parse().unwrap()],
                 slot: None
             }
         );
@@ -127,7 +158,7 @@ mod test {
             input,
             Plan {
                 line: None,
-                range: "0-10".parse().unwrap(),
+                destinations: vec!["0-10".parse().unwrap()],
                 slot: Some("2020-01-01T00:00:00/2020-01-01T00:00:00".parse().unwrap())
             }
         )
@@ -140,7 +171,7 @@ mod test {
             input,
             Plan {
                 line: None,
-                range: "0".parse().unwrap(),
+                destinations: vec!["0".parse().unwrap()],
                 slot: None
             }
         )

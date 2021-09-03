@@ -1,0 +1,15 @@
+cycle:
+  serial: "/dev/ttyUSB0"
+  # Show a new destination every 9 seconds
+  interval_secs: 9
+  # Show events that are running or start in the next 12 minutes
+  lookahead: 12
+  plan:
+    # ROBOEXOTICA (shown every day)
+    - destinations:
+      - 0
+    # 18:00 - 24:00 Exhibition
+    - destinations:
+        - 6
+      slot: 2021-09-09T18:00:00/2021-09-10T00:00:00
+

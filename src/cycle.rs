@@ -12,14 +12,14 @@ const RETRY_INTERVAL: Duration = Duration::from_secs(5);
 pub fn cycle(options: &Cycle) -> Result<()> {
     assert!(options.interval_secs > 1.0, "Expected at least 1s delay");
     assert!(
-        !options.indexes.is_empty(),
+        !options.plan.is_empty(),
         "Expected at least one destination index"
     );
     assert!(options.lookahead > 0, "Expected positive lookahead");
 
     let sleep_duration = Duration::from_secs_f64(options.interval_secs);
 
-    for destination_index in options.indexes.iter().cycle() {
+    for destination_index in options.plan.iter().cycle() {
         let now = Local::now().naive_local();
         if let Some(slot) = destination_index.slot() {
             if now > slot.end() {
@@ -32,8 +32,11 @@ pub fn cycle(options: &Cycle) -> Result<()> {
         }
 
         let line = destination_index.line();
-        let range = destination_index.range();
-        for destination_index in range.iter() {
+        let destinations = destination_index
+            .destinations()
+            .iter()
+            .flat_map(|r| r.iter());
+        for destination_index in destinations {
             let destination_args = Destination {
                 index: destination_index as u16,
                 line,

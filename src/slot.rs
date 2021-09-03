@@ -1,5 +1,6 @@
 //! A time slot.
 use chrono::NaiveDateTime;
+use serde::{de, Deserialize, Deserializer};
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -16,6 +17,16 @@ impl Slot {
 
     pub fn end(&self) -> NaiveDateTime {
         self.end
+    }
+}
+
+impl<'de> Deserialize<'de> for Slot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(de::Error::custom)
     }
 }
 
@@ -38,8 +49,12 @@ impl FromStr for Slot {
             return Err(ParseSlotError::too_much(source));
         }
 
-        let start = start.parse::<NaiveDateTime>()?;
-        let end = end.parse::<NaiveDateTime>()?;
+        let start = start
+            .parse::<NaiveDateTime>()
+            .map_err(|err| ParseSlotError::date_format(start, err))?;
+        let end = end
+            .parse::<NaiveDateTime>()
+            .map_err(|err| ParseSlotError::date_format(end, err))?;
 
         if start > end {
             return Err(ParseSlotError::from_after_to(start, end));
@@ -63,8 +78,11 @@ pub enum ParseSlotError {
         start: NaiveDateTime,
         end: NaiveDateTime,
     },
-    #[error("Could not parse time part in timeslot: {0}")]
-    DateFormat(#[from] chrono::ParseError),
+    #[error("Could not parse time part in timeslot `{not_parsed}`: {cause}")]
+    DateFormat {
+        not_parsed: String,
+        cause: chrono::ParseError,
+    },
 }
 
 impl ParseSlotError {
@@ -82,6 +100,13 @@ impl ParseSlotError {
 
     fn from_after_to(start: NaiveDateTime, end: NaiveDateTime) -> Self {
         Self::FromAfterTo { start, end }
+    }
+
+    fn date_format(not_parsed: &str, cause: chrono::ParseError) -> Self {
+        Self::DateFormat {
+            not_parsed: not_parsed.to_string(),
+            cause,
+        }
     }
 }
 
@@ -141,7 +166,7 @@ mod test {
             .parse::<Slot>()
             .unwrap_err()
         {
-            ParseSlotError::DateFormat(_) => (),
+            ParseSlotError::DateFormat { .. } => (),
             err => panic!("Unexpected error: {:?}", err),
         }
     }
@@ -152,7 +177,7 @@ mod test {
             .parse::<Slot>()
             .unwrap_err()
         {
-            ParseSlotError::DateFormat(_) => (),
+            ParseSlotError::DateFormat { .. } => (),
             err => panic!("Unexpected error: {:?}", err),
         }
     }

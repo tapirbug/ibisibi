@@ -4,6 +4,7 @@
 //! Can be parsed from strings like `0-10` but also single numbers like `4`.
 //! The notation is inclusive for both the start and the end element.
 
+use serde::{de, Deserialize, Deserializer};
 use std::cmp::Ordering;
 use std::iter::Iterator;
 use std::str::FromStr;
@@ -19,6 +20,16 @@ pub struct Range {
 pub struct RangeIter {
     range: Range,
     exhausted: bool,
+}
+
+impl<'de> Deserialize<'de> for Range {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(de::Error::custom)
+    }
 }
 
 impl Range {
