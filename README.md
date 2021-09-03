@@ -5,7 +5,7 @@ Confirmed to work on Windows and Linux.
 
 ## Install
 You can download a release tarball from Github for your platform.
-On linux platforms you can use the install script to run `examples/robo.yaml` as a
+On linux platforms you can use the install script to run [`examples/robo.yaml`](examples/robo.yaml) as a
 systemd service, e.g. to set up on Raspberry Pi log in via ssh and run:
 ```
 wget -c https://github.com/tapirbug/ibisibi/releases/download/0.3.0/ibisibi-0.3.0-arm-unknown-linux-gnueabihf.tar.gz -O - \
@@ -13,7 +13,7 @@ wget -c https://github.com/tapirbug/ibisibi/releases/download/0.3.0/ibisibi-0.3.
 cd ibisibi-0.3.0-arm-unknown-linux-gnueabihf && \
 ./install.sh
 ```
-You may be required to enter your password when the install script installs the unit files.
+You may be required to enter your password when the install script installs the `ibisibi.service` unit file.
 
 ## Examples
 To list available serial ports:
