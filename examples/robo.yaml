@@ -1,0 +1,49 @@
+cycle:
+  serial: "/dev/ttyUSB0"
+  # Show a new destination every 9 seconds
+  interval_secs: 9
+  # Show events exactly in the specified timeframe and no sooner
+  lookahead: 0
+  plan:
+    # ROBOEXOTICA (shown all day every day)
+    - destinations:
+      - 0
+    # Nights
+    - destinations:
+        - 11
+      slots:
+        - 2021-09-10T00:00:00/2021-09-10T06:00:00
+        - 2021-09-11T00:00:00/2021-09-11T06:00:00
+        - 2021-09-12T00:00:00/2021-09-12T06:00:00
+    # First day and days before festival: 18:00 - 24:00 Exhibition
+    - destinations:
+        - 6
+      slots:
+        - 2021-09-01T00:00:00/2021-09-10T00:00:00
+    # Second and third day of festival: 16:00 - 24:00 Exhibition
+    - destinations:
+        - 11
+      slots:
+        - 2021-09-10T06:00:00/2021-09-10T23:59:59
+        - 2021-09-11T06:00:00/2021-09-11T23:59:59
+    # Second day: Coffeebots 20:00-21:00
+    - destinations:
+        - 3
+      slots:
+        - 2021-09-10T06:00:00/2021-09-10T21:00:00
+    # Second day: Live Set  Roland von der Aist 21:00-24:00
+    - destinations:
+        - 4
+      slots:
+        - 2021-09-10T06:00:00/2021-09-10T23:59:59
+    # Third day: Panel 17:00 and Coffeebots until 21:00
+    - destinations:
+        - 7
+      slots:
+        - 2021-09-11T06:00:00/2021-09-11T21:00:00
+    # Third day: Award show and miss ex until 24:00
+    - destinations:
+        - 8
+      slots:
+        - 2021-09-11T06:00:00/2021-09-11T23:59:59
+
