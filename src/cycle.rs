@@ -17,10 +17,9 @@ pub fn cycle(options: &Cycle) -> Result<()> {
         !options.plan.is_empty(),
         "Expected at least one destination index"
     );
-    assert!(options.lookahead > 0, "Expected positive lookahead");
 
     let sleep_duration = Duration::from_secs_f64(options.interval_secs);
-    let lookahead = ChronoDuration::hours(options.lookahead);
+    let lookahead = ChronoDuration::hours(options.lookahead as i64);
     loop {
         let active_count = options
             .plan

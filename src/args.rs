@@ -68,7 +68,7 @@ pub struct Cycle {
     pub interval_secs: f64,
     /// show scheduled destinations this many hours before scheduled start
     #[argh(option, short = 'i', default = "12")]
-    pub lookahead: i64,
+    pub lookahead: u32,
     /// serial port to use, e.g. /dev/ttyUSB0 on Linux, or COM5 on Windows.
     #[argh(option, short = 's')]
     pub serial: String,
