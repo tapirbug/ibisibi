@@ -107,9 +107,9 @@ mod test {
         let args: TopLevel = argh::FromArgs::from_args(&["ibisibi"], &args).unwrap();
         match args.invocation {
             Invocation::Cycle(Cycle { plan, .. }) => {
-                assert_eq!(plan[0].destinations(), vec!["0".parse().unwrap()]);
+                assert_eq!(plan[0].destinations(), &["0".parse().unwrap()]);
                 assert!(plan[0].slots().is_empty());
-                assert_eq!(plan[1].destinations(), vec!["2-3".parse().unwrap()]);
+                assert_eq!(plan[1].destinations(), &["2-3".parse().unwrap()]);
                 assert_eq!(
                     plan[1].slots(),
                     &["2021-09-09T20:00:00/2021-09-09T21:00:00".parse().unwrap()]
