@@ -4,6 +4,7 @@ mod destination;
 mod list;
 mod plan;
 mod range;
+mod record;
 mod run;
 mod slot;
 mod telegram;
