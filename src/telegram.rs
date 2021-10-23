@@ -114,7 +114,7 @@ impl Telegram {
     }
 
     /// Gets the telegram as an immutable sequence of bytes, including carriage return
-    /// and paritiy byte.
+    /// and parity byte.
     pub fn as_bytes(&self) -> &[u8] {
         &self.0[..]
     }
