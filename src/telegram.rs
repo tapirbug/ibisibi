@@ -4,9 +4,9 @@
 //! we speak of a _telegram_ in documentation, we mean the concept that is
 //! called "Datensatz" in german, e.g. DS003.
 
+use builder::Builder;
 use std::fmt;
 use std::str::from_utf8;
-use builder::Builder;
 
 /// A telegram in the IBIS protocol, binary, including trailing carriage return
 /// and checksum. The contained data is guaranteed to be a valid telegram
@@ -47,9 +47,9 @@ impl Telegram {
             "Line must be in range 1--999 so that it is non-zero and can be represented with three decimal digits"
           );
         Builder::with_msg_len(4) // l000 has four bytes
-          .byte(b'l')
-          .three_digits(line_nr)
-          .finish()
+            .byte(b'l')
+            .three_digits(line_nr)
+            .finish()
     }
 
     /// Produces a DS003 telegram, selecting a destination by index.
@@ -65,62 +65,71 @@ impl Telegram {
           "Destination must be in range 0--999 so that it can be represented with three decimal digits"
         );
         Builder::with_msg_len(4) // z000 has four bytes
-          .byte(b'z')
-          .three_digits(destination_idx)
-          .finish()
+            .byte(b'z')
+            .three_digits(destination_idx)
+            .finish()
     }
 
     /// Produces a DS20 telegram, querying the status of a display device. Suitable for
     /// both interior or exterior displays.
-    /// 
+    ///
     /// Given address must be range 0-15 so that it can be represented with ASCII digits
     /// ranging from `b'0'` to `b'?'`. The standard does not seem to allow `b'0'` as an
     /// address but we have seen software in the wild that uses address 0 so we support
     /// it here.
-    /// 
+    ///
     /// The response is an `a<status>` followed by some ASCII decimal for the status.
     /// Statuses `b'0'` and `b'3'` have been seen in the wild, but their meaning is not
     /// clear.
-    /// 
+    ///
     /// # Panics
     /// This function panics if the address is higher than 15.
     pub fn display_status(address: u8) -> Telegram {
-        assert!(address <= 15, "Address for display status query must be in range 0-15");
+        assert!(
+            address <= 15,
+            "Address for display status query must be in range 0-15"
+        );
         Builder::with_msg_len(2) // a0 has two bytes
-          .byte(b'a')
-          .address(address)
-          .finish()
+            .byte(b'a')
+            .address(address)
+            .finish()
     }
 
     /// Produces a DS120 telegram, querying the software version or versionf of a display
     /// device. Suitable for both interior or exterior displays.
-    /// 
+    ///
     /// Given address must be range 0-15 so that it can be represented with ASCII digits
     /// ranging from `b'0'` to `b'?'`. The standard does not seem to allow `b'0'` as an
     /// address but we have seen software in the wild that uses address 0 so we support
     /// it here.
-    /// 
+    ///
     /// Example response from a BS210 flipdot display: `aVV2.3RigaB/H7/99`.
-    /// 
+    ///
     /// # Panics
     /// This function panics if the address is higher than 15.
     pub fn display_version(address: u8) -> Telegram {
-        assert!(address <= 15, "Address for display version query must be in range 0-15");
+        assert!(
+            address <= 15,
+            "Address for display version query must be in range 0-15"
+        );
         Builder::with_msg_len(3) // aV0 has three bytes
-          .byte(b'a')
-          .byte(b'V')
-          .address(address)
-          .finish()
+            .byte(b'a')
+            .byte(b'V')
+            .address(address)
+            .finish()
     }
 
     /// Command of unknown purpose that is sent before flashing a sign database to a
     /// BS210 sign on specific address. It has a prefix of 0D 72 before the actual message
     /// that is not included in the checksum.
-    /// 
+    ///
     /// In our tests we never saw any response to this message, so it might also not be
     /// relevant at all.
     pub fn bs_select_address(address: u8) -> Telegram {
-        assert!(address <= 15, "Address for select address must be in range 0-15");
+        assert!(
+            address <= 15,
+            "Address for select address must be in range 0-15"
+        );
         Builder::with_msg_len(5)
             .prefix(&[0x0D, 0x72])
             .byte(0x1B)
@@ -285,7 +294,7 @@ mod test {
         let telegram = Telegram::bs_select_address(1);
         assert_eq!(
             telegram.as_bytes(),
-            &[ 0x0d, 0x72, 0x1b, 0x53, 0x31, 0x0d, 0x0b ]
+            &[0x0d, 0x72, 0x1b, 0x53, 0x31, 0x0d, 0x0b]
         );
     }
 }
@@ -295,21 +304,24 @@ mod builder {
 
     pub struct Builder {
         prefix_len: usize,
-        message: Vec<u8>
+        message: Vec<u8>,
     }
-    
+
     impl Builder {
         pub fn with_msg_len(expected_len: usize) -> Self {
             Builder {
                 prefix_len: 0,
                 // 2 extra bytes for CR and parity byte
-                message: Vec::with_capacity(expected_len + 2)
+                message: Vec::with_capacity(expected_len + 2),
             }
         }
 
         /// Adds a prefix at the start of the message that is not included in the checksum.
         pub fn prefix(mut self, prefix: &[u8]) -> Self {
-            assert!(self.message.is_empty(), "expected empty message when specifying prefix");
+            assert!(
+                self.message.is_empty(),
+                "expected empty message when specifying prefix"
+            );
             self.prefix_len = prefix.len();
             self.message.extend(prefix);
             self
@@ -337,7 +349,9 @@ mod builder {
             let hundreds = num / 100;
             let tens = (num - hundreds * 100) / 10;
             let ones = num - hundreds * 100 - tens * 10;
-            self.digit(hundreds as u8).digit(tens as u8).digit(ones as u8)
+            self.digit(hundreds as u8)
+                .digit(tens as u8)
+                .digit(ones as u8)
         }
 
         /// Appends the final CR and parity byte and returns the finished telegram.
@@ -373,10 +387,7 @@ mod builder {
         #[test]
         fn build_status() {
             let telegram = Builder::with_msg_len(2).byte(b'a').digit(0).finish().0;
-            assert_eq!(
-                telegram,
-                vec![ b'a', b'0', b'\r', 0x23 ]
-            )
+            assert_eq!(telegram, vec![b'a', b'0', b'\r', 0x23])
         }
     }
 }
