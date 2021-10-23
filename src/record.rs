@@ -1,6 +1,8 @@
 /// A chunk of a record database that corresponds to a single line in a sign database
 /// of a BS210 sign, but in a different format that is understood by the sign when
 /// sending the data over the wire, rather then when viewing it in an editor.
+/// 
+/// Also used for clearing the device and for querying some version information.
 struct Record {
     data: Vec<u8>
 }
