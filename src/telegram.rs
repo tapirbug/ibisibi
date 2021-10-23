@@ -113,6 +113,22 @@ impl Telegram {
           .finish()
     }
 
+    /// Command of unknown purpose that is sent before flashing a sign database to a
+    /// BS210 sign on specific address. It has a prefix of 0D 72 before the actual message
+    /// that is not included in the checksum.
+    /// 
+    /// In our tests we never saw any response to this message, so it might also not be
+    /// relevant at all.
+    pub fn bs_select_address(address: u8) -> Telegram {
+        assert!(address <= 15, "Address for select address must be in range 0-15");
+        Builder::with_msg_len(5)
+            .prefix(&[0x0D, 0x72])
+            .byte(0x1B)
+            .byte(b'S')
+            .address(address)
+            .finish()
+    }
+
     /// Gets the telegram as an immutable sequence of bytes, including carriage return
     /// and parity byte.
     pub fn as_bytes(&self) -> &[u8] {
@@ -263,6 +279,17 @@ mod test {
         let telegram = &format!("{:?}", telegram);
         assert_eq!(telegram, "a0<CR><P:23>");
     }
+
+    #[test]
+    fn select_address_1() {
+        let telegram = Telegram::bs_select_address(1);
+        assert_eq!(
+            telegram.as_bytes(),
+            &[ 0x0d, 0x72, 0x1b, 0x53, 0x31, 0x0d, 0x0b ]
+        );
+    }
+}
+
 mod builder {
     use super::Telegram;
 
@@ -278,6 +305,14 @@ mod builder {
                 // 2 extra bytes for CR and parity byte
                 message: Vec::with_capacity(expected_len + 2)
             }
+        }
+
+        /// Adds a prefix at the start of the message that is not included in the checksum.
+        pub fn prefix(mut self, prefix: &[u8]) -> Self {
+            assert!(self.message.is_empty(), "expected empty message when specifying prefix");
+            self.prefix_len = prefix.len();
+            self.message.extend(prefix);
+            self
         }
 
         pub fn byte(mut self, byte: u8) -> Self {
