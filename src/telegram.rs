@@ -6,6 +6,7 @@
 
 use std::fmt;
 use std::str::from_utf8;
+use builder::Builder;
 
 /// A telegram in the IBIS protocol, binary, including trailing carriage return
 /// and checksum. The contained data is guaranteed to be a valid telegram
@@ -45,10 +46,10 @@ impl Telegram {
             line_nr > 0 && line_nr <= 999,
             "Line must be in range 1--999 so that it is non-zero and can be represented with three decimal digits"
           );
-        let mut telegram = alloc_telegram(4); // l000 has four bytes
-        telegram.push(b'l');
-        append_three_digits(line_nr, &mut telegram);
-        finish_telegram(telegram)
+        Builder::with_msg_len(4) // l000 has four bytes
+          .byte(b'l')
+          .three_digits(line_nr)
+          .finish()
     }
 
     /// Produces a DS003 telegram, selecting a destination by index.
@@ -63,10 +64,10 @@ impl Telegram {
           destination_idx <= 999,
           "Destination must be in range 0--999 so that it can be represented with three decimal digits"
         );
-        let mut telegram = alloc_telegram(4); // l000 has four bytes
-        telegram.push(b'z');
-        append_three_digits(destination_idx, &mut telegram);
-        finish_telegram(telegram)
+        Builder::with_msg_len(4) // z000 has four bytes
+          .byte(b'z')
+          .three_digits(destination_idx)
+          .finish()
     }
 
     /// Produces a DS20 telegram, querying the status of a display device. Suitable for
@@ -85,10 +86,10 @@ impl Telegram {
     /// This function panics if the address is higher than 15.
     pub fn display_status(address: u8) -> Telegram {
         assert!(address <= 15, "Address for display status query must be in range 0-15");
-        let mut telegram = alloc_telegram(2);
-        telegram.push(b'a');
-        append_address(address, &mut telegram);
-        finish_telegram(telegram)
+        Builder::with_msg_len(2) // a0 has two bytes
+          .byte(b'a')
+          .address(address)
+          .finish()
     }
 
     /// Produces a DS120 telegram, querying the software version or versionf of a display
@@ -105,11 +106,11 @@ impl Telegram {
     /// This function panics if the address is higher than 15.
     pub fn display_version(address: u8) -> Telegram {
         assert!(address <= 15, "Address for display version query must be in range 0-15");
-        let mut telegram = alloc_telegram(3);
-        telegram.push(b'a');
-        telegram.push(b'V');
-        append_address(address, &mut telegram);
-        finish_telegram(telegram)
+        Builder::with_msg_len(3) // aV0 has three bytes
+          .byte(b'a')
+          .byte(b'V')
+          .address(address)
+          .finish()
     }
 
     /// Gets the telegram as an immutable sequence of bytes, including carriage return
@@ -117,48 +118,6 @@ impl Telegram {
     pub fn as_bytes(&self) -> &[u8] {
         &self.0[..]
     }
-}
-
-fn alloc_telegram(telegram_len: usize) -> Vec<u8> {
-    // 2 extra bytes for CR and parity byte
-    Vec::with_capacity(telegram_len + 2)
-}
-
-fn append_three_digits(num: u16, onto: &mut Vec<u8>) {
-    assert!(num <= 999);
-
-    let hundreds = num / 100;
-    let tens = (num - hundreds * 100) / 10;
-    let ones = num - hundreds * 100 - tens * 10;
-
-    let hundreds = b'0' + (hundreds as u8);
-    let tens = b'0' + (tens as u8);
-    let ones = b'0' + (ones as u8);
-
-    onto.push(hundreds);
-    onto.push(tens);
-    onto.push(ones);
-}
-
-fn append_address(address: u8, onto: &mut Vec<u8>) {
-    assert!(address <= 15);
-    let address = b'0' + address;
-    onto.push(address);
-}
-
-fn parity_byte(data: &[u8]) -> u8 {
-    const EMPTY_PARITY: u8 = 0x7F;
-    data.iter().fold(EMPTY_PARITY, |acc, next| acc ^ next)
-}
-
-/// Appends the final CR and parity byte and returns the finished telegram.
-///
-/// Typically does not allocate for fixed-length telegrams, which have been
-/// allocated with `alloc_telegram`.
-fn finish_telegram(mut content: Vec<u8>) -> Telegram {
-    content.push(b'\r'); // parity includes carriage return
-    content.push(parity_byte(&content));
-    Telegram(content)
 }
 
 #[cfg(test)]
@@ -303,5 +262,86 @@ mod test {
         let telegram = Telegram::display_status(0);
         let telegram = &format!("{:?}", telegram);
         assert_eq!(telegram, "a0<CR><P:23>");
+    }
+mod builder {
+    use super::Telegram;
+
+    pub struct Builder {
+        prefix_len: usize,
+        message: Vec<u8>
+    }
+    
+    impl Builder {
+        pub fn with_msg_len(expected_len: usize) -> Self {
+            Builder {
+                prefix_len: 0,
+                // 2 extra bytes for CR and parity byte
+                message: Vec::with_capacity(expected_len + 2)
+            }
+        }
+
+        pub fn byte(mut self, byte: u8) -> Self {
+            self.message.push(byte);
+            self
+        }
+
+        pub fn digit(self, digit: u8) -> Self {
+            assert!(digit < 10, "digit out of range 0..=9");
+            let digit = b'0' + digit;
+            self.byte(digit)
+        }
+
+        pub fn address(self, address: u8) -> Self {
+            assert!(address < 16, "address out of range 0..=15");
+            let address = b'0' + address;
+            self.byte(address)
+        }
+
+        pub fn three_digits(self, num: u16) -> Self {
+            assert!(num <= 999, "digits out of range 0..=999");
+            let hundreds = num / 100;
+            let tens = (num - hundreds * 100) / 10;
+            let ones = num - hundreds * 100 - tens * 10;
+            self.digit(hundreds as u8).digit(tens as u8).digit(ones as u8)
+        }
+
+        /// Appends the final CR and parity byte and returns the finished telegram.
+        pub fn finish(mut self) -> Telegram {
+            // parity includes carriage return
+            self.message.push(b'\r');
+            // prefix_len is always <= message len when constructed through Builder methods
+            let parity = parity_byte(&self.message[self.prefix_len..]);
+            self.message.push(parity);
+            // take message and leave empty message in the builder
+            Telegram(self.message)
+        }
+    }
+
+    fn parity_byte(data: &[u8]) -> u8 {
+        const EMPTY_PARITY: u8 = 0x7F;
+        data.iter().fold(EMPTY_PARITY, |acc, next| acc ^ next)
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[test]
+        fn line_26_parity_byte() {
+            assert_eq!(
+                parity_byte(&[b'l', b'0', b'2', b'6', b'\r']),
+                0x2A,
+                "Unexpected result for parity byte of known telegram"
+            )
+        }
+
+        #[test]
+        fn build_status() {
+            let telegram = Builder::with_msg_len(2).byte(b'a').digit(0).finish().0;
+            assert_eq!(
+                telegram,
+                vec![ b'a', b'0', b'\r', 0x23 ]
+            )
+        }
     }
 }
