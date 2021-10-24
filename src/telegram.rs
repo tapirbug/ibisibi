@@ -301,6 +301,7 @@ mod test {
 
 mod builder {
     use super::Telegram;
+    use crate::parity::parity_byte;
 
     pub struct Builder {
         prefix_len: usize,
@@ -366,23 +367,9 @@ mod builder {
         }
     }
 
-    fn parity_byte(data: &[u8]) -> u8 {
-        const EMPTY_PARITY: u8 = 0x7F;
-        data.iter().fold(EMPTY_PARITY, |acc, next| acc ^ next)
-    }
-
     #[cfg(test)]
     mod test {
         use super::*;
-
-        #[test]
-        fn line_26_parity_byte() {
-            assert_eq!(
-                parity_byte(&[b'l', b'0', b'2', b'6', b'\r']),
-                0x2A,
-                "Unexpected result for parity byte of known telegram"
-            )
-        }
 
         #[test]
         fn build_status() {
