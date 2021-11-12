@@ -4,11 +4,10 @@ use crate::{
     parity::parity_byte
 };
 use thiserror::Error;
+use std::io::{Read, Write};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Queries the status of the display device at the given index and
-/// returns the response as a number starting at 0.
 pub fn status(serial: &mut Serial, address: u8) -> Result<Status> {
     assert!(address < 16, "Expected address in range 0..=15");
 
@@ -34,6 +33,7 @@ pub fn status(serial: &mut Serial, address: u8) -> Result<Status> {
 
 /// Responses from the display status command. Not well understood.
 #[non_exhaustive]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Status {
     /// When listing devices in the beginning, we always got back status
     /// `b'3'` with unknown meaning, but presumably that everything is ok.
@@ -45,7 +45,8 @@ pub enum Status {
     /// The meanings of most numbers are not clear. Everything other than
     /// `b'0'` and `b'3'` gets constructed as this variant. The `u8` holds the
     /// value of the unknown status as sent over the wire, so presumably
-    /// `b'1'`, `b'2'`, or `b'4'` onwards.
+    /// `b'1'`, `b'2'`, or `b'4'` onwards, that is, the ASCII digit is not
+    /// converted to a number.
     Uncategorized(u8)
 }
 
@@ -78,5 +79,85 @@ impl Error {
 
 #[cfg(test)]
 mod test {
+    use super::*;
 
+    #[test]
+    fn timeout() {
+        let mut serial = Serial::builder()
+                .time_out()
+                .build();
+
+        let err = status(&mut serial, 0).unwrap_err();
+
+        assert!(
+            err.is_timed_out(),
+            "Expected timeout error"
+        )
+    }
+
+    #[test]
+    fn checksum_err() {
+        let mut serial = Serial::builder()
+                .receive(b"a0\r0") // correct checksum would be #, not 0
+                .build();
+
+        let err = status(&mut serial, 0).unwrap_err();
+
+        match err {
+            Error::Parity { .. } => {}
+            err => panic!("Unexpected error: {:?}", err)
+        }
+    }
+
+    #[test]
+    fn ok() {
+        let mut serial = Serial::builder()
+                .receive(b"a3\r ")
+                .build();
+
+        let status = status(&mut serial, 0).unwrap();
+
+        assert_eq!(
+            status,
+            Status::Ok,
+            "Expected status 3 to be interpreted as Ok"
+        )
+    }
+
+    #[test]
+    fn ready_for_data() {
+        let mut serial = Serial::builder()
+                .receive(b"a0\r#")
+                .build();
+
+        let status = status(&mut serial, 9).unwrap();
+
+        assert_eq!(
+            status,
+            Status::ReadyForData,
+            "Expected status 0 to be interpreted as ReadyForData"
+        )
+    }
+
+    #[test]
+    fn uncategorized_status() {
+        let mut serial = Serial::builder()
+                .receive(b"a7\r$")
+                .build();
+
+        let status = status(&mut serial, 8).unwrap();
+
+        assert_eq!(
+            status,
+            Status::Uncategorized(b'7'),
+            "Expected status 7 to be uncategorized"
+        )
+    }
+
+    #[should_panic]
+    #[test]
+    fn address_out_of_bounds() {
+        let mut serial = Serial::builder().build();
+        status(&mut serial, 0x10).unwrap();
+    }
 }
