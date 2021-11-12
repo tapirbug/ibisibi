@@ -17,7 +17,10 @@ pub struct TopLevel {
 pub enum Invocation {
     #[serde(skip)]
     Run(Run),
+    #[serde(skip)]
     List(List),
+    #[serde(skip)]
+    Scan(Scan),
     Destination(Destination),
     Cycle(Cycle),
 }
@@ -34,6 +37,15 @@ pub struct Run {
 #[derive(FromArgs, Deserialize)]
 #[argh(subcommand, name = "list")]
 pub struct List {}
+
+/// Finds available addresses of display devices on the specified serial port.
+#[derive(FromArgs)]
+#[argh(subcommand, name = "scan")]
+pub struct Scan {
+    /// serial port to use, e.g. /dev/ttyUSB0 on Linux, or COM5 on Windows.
+    #[argh(option, short = 's')]
+    pub serial: String,
+}
 
 /// Set the currently shown destination to the one with the given index
 /// using telegram DS003.

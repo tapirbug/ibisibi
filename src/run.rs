@@ -7,6 +7,7 @@ pub fn run(invocation: Invocation) -> Result<(), String> {
     match invocation {
         Invocation::Run(run) => run_yaml(run).map_err(|e| format!("{}", e)),
         Invocation::List(list) => crate::list::list(list).map_err(|e| format!("{}", e)),
+        Invocation::Scan(scan) => crate::devices::scan(scan).map_err(|e| format!("{}", e)),
         Invocation::Destination(destination) => {
             crate::destination::destination(&destination).map_err(|e| format!("{}", e))
         }

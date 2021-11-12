@@ -5,6 +5,7 @@ use crate::{
 };
 use thiserror::Error;
 use std::io::{Read, Write};
+use std::fmt::{self, Formatter, Display};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -33,7 +34,7 @@ pub fn status(serial: &mut Serial, address: u8) -> Result<Status> {
 
 /// Responses from the display status command. Not well understood.
 #[non_exhaustive]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
     /// When listing devices in the beginning, we always got back status
     /// `b'3'` with unknown meaning, but presumably that everything is ok.
@@ -56,6 +57,16 @@ impl From<u8> for Status {
             b'0' => Status::ReadyForData,
             b'3' => Status::Ok,
             other => Status::Uncategorized(other)
+        }
+    }
+}
+
+impl Display for Status {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Status::Ok => write!(f, "Ok (3)"),
+            Status::ReadyForData => write!(f, "Ready for data (0)"),
+            Status::Uncategorized(status) => write!(f, "Unknown status ({})", status),
         }
     }
 }
