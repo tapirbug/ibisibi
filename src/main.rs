@@ -1,12 +1,14 @@
 mod args;
 mod cycle;
 mod destination;
+mod devices;
 mod list;
 mod parity;
 mod plan;
 mod range;
 mod record;
 mod run;
+mod scan;
 mod slot;
 mod status;
 mod telegram;
