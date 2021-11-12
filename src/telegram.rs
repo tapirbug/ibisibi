@@ -1,4 +1,4 @@
-//! Types for IBIS telegrams.
+//! Types that generate IBIS telegrams.
 //!
 //! Not sure about the correct English terminology for the concept, so when
 //! we speak of a _telegram_ in documentation, we mean the concept that is
@@ -142,6 +142,86 @@ impl Telegram {
     /// and parity byte.
     pub fn as_bytes(&self) -> &[u8] {
         &self.0[..]
+    }
+}
+
+mod builder {
+    use super::Telegram;
+    use crate::parity::parity_byte;
+
+    pub struct Builder {
+        prefix_len: usize,
+        message: Vec<u8>,
+    }
+
+    impl Builder {
+        pub fn with_msg_len(expected_len: usize) -> Self {
+            Builder {
+                prefix_len: 0,
+                // 2 extra bytes for CR and parity byte
+                message: Vec::with_capacity(expected_len + 2),
+            }
+        }
+
+        /// Adds a prefix at the start of the message that is not included in the checksum.
+        pub fn prefix(mut self, prefix: &[u8]) -> Self {
+            assert!(
+                self.message.is_empty(),
+                "expected empty message when specifying prefix"
+            );
+            self.prefix_len = prefix.len();
+            self.message.extend(prefix);
+            self
+        }
+
+        pub fn byte(mut self, byte: u8) -> Self {
+            self.message.push(byte);
+            self
+        }
+
+        pub fn digit(self, digit: u8) -> Self {
+            assert!(digit < 10, "digit out of range 0..=9");
+            let digit = b'0' + digit;
+            self.byte(digit)
+        }
+
+        pub fn address(self, address: u8) -> Self {
+            assert!(address < 16, "address out of range 0..=15");
+            let address = b'0' + address;
+            self.byte(address)
+        }
+
+        pub fn three_digits(self, num: u16) -> Self {
+            assert!(num <= 999, "digits out of range 0..=999");
+            let hundreds = num / 100;
+            let tens = (num - hundreds * 100) / 10;
+            let ones = num - hundreds * 100 - tens * 10;
+            self.digit(hundreds as u8)
+                .digit(tens as u8)
+                .digit(ones as u8)
+        }
+
+        /// Appends the final CR and parity byte and returns the finished telegram.
+        pub fn finish(mut self) -> Telegram {
+            // parity includes carriage return
+            self.message.push(b'\r');
+            // prefix_len is always <= message len when constructed through Builder methods
+            let parity = parity_byte(&self.message[self.prefix_len..]);
+            self.message.push(parity);
+            // take message and leave empty message in the builder
+            Telegram(self.message)
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[test]
+        fn build_status() {
+            let telegram = Builder::with_msg_len(2).byte(b'a').digit(0).finish().0;
+            assert_eq!(telegram, vec![b'a', b'0', b'\r', 0x23])
+        }
     }
 }
 
@@ -296,85 +376,5 @@ mod test {
             telegram.as_bytes(),
             &[0x0d, 0x72, 0x1b, 0x53, 0x31, 0x0d, 0x0b]
         );
-    }
-}
-
-mod builder {
-    use super::Telegram;
-    use crate::parity::parity_byte;
-
-    pub struct Builder {
-        prefix_len: usize,
-        message: Vec<u8>,
-    }
-
-    impl Builder {
-        pub fn with_msg_len(expected_len: usize) -> Self {
-            Builder {
-                prefix_len: 0,
-                // 2 extra bytes for CR and parity byte
-                message: Vec::with_capacity(expected_len + 2),
-            }
-        }
-
-        /// Adds a prefix at the start of the message that is not included in the checksum.
-        pub fn prefix(mut self, prefix: &[u8]) -> Self {
-            assert!(
-                self.message.is_empty(),
-                "expected empty message when specifying prefix"
-            );
-            self.prefix_len = prefix.len();
-            self.message.extend(prefix);
-            self
-        }
-
-        pub fn byte(mut self, byte: u8) -> Self {
-            self.message.push(byte);
-            self
-        }
-
-        pub fn digit(self, digit: u8) -> Self {
-            assert!(digit < 10, "digit out of range 0..=9");
-            let digit = b'0' + digit;
-            self.byte(digit)
-        }
-
-        pub fn address(self, address: u8) -> Self {
-            assert!(address < 16, "address out of range 0..=15");
-            let address = b'0' + address;
-            self.byte(address)
-        }
-
-        pub fn three_digits(self, num: u16) -> Self {
-            assert!(num <= 999, "digits out of range 0..=999");
-            let hundreds = num / 100;
-            let tens = (num - hundreds * 100) / 10;
-            let ones = num - hundreds * 100 - tens * 10;
-            self.digit(hundreds as u8)
-                .digit(tens as u8)
-                .digit(ones as u8)
-        }
-
-        /// Appends the final CR and parity byte and returns the finished telegram.
-        pub fn finish(mut self) -> Telegram {
-            // parity includes carriage return
-            self.message.push(b'\r');
-            // prefix_len is always <= message len when constructed through Builder methods
-            let parity = parity_byte(&self.message[self.prefix_len..]);
-            self.message.push(parity);
-            // take message and leave empty message in the builder
-            Telegram(self.message)
-        }
-    }
-
-    #[cfg(test)]
-    mod test {
-        use super::*;
-
-        #[test]
-        fn build_status() {
-            let telegram = Builder::with_msg_len(2).byte(b'a').digit(0).finish().0;
-            assert_eq!(telegram, vec![b'a', b'0', b'\r', 0x23])
-        }
     }
 }
