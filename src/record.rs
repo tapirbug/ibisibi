@@ -1,6 +1,7 @@
 pub type Result<T> = std::result::Result<T, Error>;
 pub use db::DatabaseChunk;
 
+use thiserror::Error;
 use builder::Builder;
 
 /// A chunk of a record database that corresponds to a single line in a sign database
@@ -32,16 +33,101 @@ impl Record {
     }
 }
 
+pub mod res {
+    use super::{Result, Error, calculate_checksum};
+
+    /// Verifies that a reponse from a BS210 conforms to the normal structure of a response
+    /// received from BS210, that is, it starts with 0x4f, followed by a record.
+    ///
+    /// This method is to be used where the contents are not well-understood and only the
+    /// length and checksum should be verified.
+    pub fn verify_response_record(buf: &[u8]) -> Result<()> {
+        if buf.len() == 0 || buf[0] != 0x4f {
+            return Err(Error::ResponseMagicNumberMissing);
+        }
+        let buf = &buf[1..];
+        if buf.len() < 2 {
+            return Err(Error::ResponseHeaderOrTrailerMissing);
+        }
+        let expected_payload_len = buf[0];
+        let payload = &buf[1..buf.len()-1];
+        if payload.len() > 0xFF {
+            return Err(Error::ResponseRecordLengthOutOfBounds {
+                len: payload.len()
+            });
+        }
+        let actual_payload_len = payload.len() as u8;
+        if actual_payload_len != expected_payload_len {
+            return Err(Error::ResponsePayloadLenMismatch {
+                expected: expected_payload_len,
+                actual: actual_payload_len
+            })
+        }
+
+        let expected_checksum = buf[buf.len() - 1];
+        let actual_checksum = calculate_checksum(payload);
+        if expected_checksum != actual_checksum {
+            return Err(Error::ResponseChecksumMismatch {
+                expected: expected_checksum,
+                actual: actual_checksum
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Verifies that the given buffer holds an acknowledgement response without an attached
+    /// record, that is 0x4F.
+    pub fn verify_ack_response(buf: &[u8]) -> Result<()> {
+        if buf.len() == 0 || buf[0] != 0x4f {
+            return Err(Error::ResponseMagicNumberMissing);
+        }
+
+        if buf != &[ 0x4f ] {
+            return Err(Error::ResponseNotAcknowledgement);
+        }
+
+        Ok(())
+    }
+
+    #[cfg(test)]
+    mod test {
+        // FIXME add tests
+    }
+}
+
 fn calculate_checksum(data: &[u8]) -> u8 {
     !data.iter().cloned().fold(0, u8::wrapping_add) + 1
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
+    #[error("Record length out of bounds")]
     RecordLengthOutOfBounds,
+    #[error("Response from sign has length that is out of bounds: {len}")]
+    ResponseRecordLengthOutOfBounds {
+        len: usize
+    },
+    #[error("Response from sign corrupt, lacking magic number")]
+    ResponseMagicNumberMissing,
+    /// Expected a response holding just the magic number, but got a complex response.
+    #[error("Acknowledgement expected but got complex response from sign")]
+    ResponseNotAcknowledgement,
+    #[error("Response from sign is too short, missing header, trailer, or both")]
+    ResponseHeaderOrTrailerMissing,
+    #[error("Response from sign corrupt, expected record length: {expected:X?}, got: {actual:X?}")]
+    ResponsePayloadLenMismatch {
+        expected: u8,
+        actual: u8
+    },
+    #[error("Response from sign corrupt, expected checksum: {expected:X?}, got: {actual:X?}")]
+    ResponseChecksumMismatch {
+        expected: u8,
+        actual: u8
+    }
 }
 
-mod db {
+pub mod db {
     use super::{Record, Result, Error, Builder};
 
     /// A record that represents a chunk from the line database, on the granularity of
@@ -152,7 +238,7 @@ mod db {
     }
 }
 
-mod query {
+pub mod query {
     //! Query messages that are sent to obtain information from the sign.
     //!
     //! It is not known if it is necessary to make these queries to start the flashing
