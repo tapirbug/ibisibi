@@ -1,10 +1,33 @@
+use serialport::{new, DataBits, Parity, StopBits, Result};
+use std::{
+    borrow::Cow,
+    convert::Into
+};
+
 /// Shorter type alias for handles to serial ports.
 ///
 /// Currently the same for all platforms but that might change in the future.
 #[cfg(not(test))]
 pub type Serial = Box<serialport::SerialPort>;
+
+/// Version of serial ports to use for tests where we choose what the device
+/// will respond.
 #[cfg(test)]
 pub type Serial = mock::MockSerial;
+
+#[cfg(not(test))]
+pub fn open<'a, D>(device: D) -> Result<Serial> where D : Into<Cow<'a, str>> {
+    new(device, 1200)
+        .data_bits(DataBits::Seven)
+        .stop_bits(StopBits::Two)
+        .parity(Parity::Even)
+        .open()
+}
+
+#[cfg(test)]
+pub fn open<'a, D>(device: D) -> Result<Serial> where D : Into<Cow<'a, str>> {
+    todo!("mocking of open function for test currently not needed")
+}
 
 #[cfg(test)]
 mod mock {
