@@ -152,6 +152,85 @@ mod db {
     }
 }
 
+mod query {
+    //! Query messages that are sent to obtain information from the sign.
+    //!
+    //! It is not known if it is necessary to make these queries to start the flashing
+    //! process, but we do it in any case because it also verifies that what we are
+    //! talking to behaves like a BS210 sign.
+
+    use super::Record;
+
+    /// First record to be sent after selecting the address.
+    ///
+    /// Device should send back `4f` when sending this query.
+    ///
+    /// It is not known what the query or the response actually mean.
+    pub fn unknown_query_0() -> &'static Record {
+        const PREPARE_FLASHING_0: &Record = &Record {
+            data: vec![ 0x06, 0x01, 0x21, 0x00, 0x00, 0x00, 0x00, 0xd8 ]
+        };
+        PREPARE_FLASHING_0
+    }
+
+    /// Second record to be sent after `prepare_flashing_0`.
+    ///
+    /// Device should send back `4f 01 57 a8` when sending this query.
+    ///
+    /// It is not known what the query or the response actually mean.
+    pub fn unknown_query_1() -> &'static Record {
+        const PREPARE_FLASHING_1: &Record = &Record {
+            data: vec![ 0x04, 0x08, 0x00, 0x20, 0x01, 0xd3 ]
+        };
+        PREPARE_FLASHING_1
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use super::super::Builder;
+
+        /// Since length and checksum are handcoded, we need to make sure that
+        /// we wrote everything down correctly by calculating a checksum over
+        /// the buffer.
+        #[test]
+        fn unknown_query_0_integrity() {
+            let static_unkown_query = unknown_query_0();
+            let calculated_unknown_query = Builder::new()
+                .buf(static_unkown_query.payload())
+                .build()
+                .unwrap();
+
+            assert_eq!(
+                static_unkown_query.checksum(),
+                calculated_unknown_query.checksum()
+            );
+            assert_eq!(
+                static_unkown_query.as_bytes(),
+                calculated_unknown_query.as_bytes()
+            );
+        }
+
+        #[test]
+        fn unknown_query_1_integrity() {
+            let static_unkown_query = unknown_query_1();
+            let calculated_unknown_query = Builder::new()
+                .buf(static_unkown_query.payload())
+                .build()
+                .unwrap();
+
+            assert_eq!(
+                static_unkown_query.checksum(),
+                calculated_unknown_query.checksum()
+            );
+            assert_eq!(
+                static_unkown_query.as_bytes(),
+                calculated_unknown_query.as_bytes()
+            );
+        }
+    }
+}
+
 mod builder {
     use std::mem::take;
     use super::{Record, calculate_checksum, Result, Error};
