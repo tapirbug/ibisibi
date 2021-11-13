@@ -1,18 +1,14 @@
 use thiserror::Error;
 use crate::{
     args::Scan as Opts,
-    scan::Scan
+    scan::Scan,
+    serial::open
 };
-use serialport::{new, DataBits, Parity, StopBits};
 
 type Result<T> = std::result::Result<T, ScanError>;
 
 pub fn scan(scan: Opts) -> Result<()> {
-    let mut serial = new(&scan.serial, 1200)
-        .data_bits(DataBits::Seven)
-        .stop_bits(StopBits::Two)
-        .parity(Parity::Even)
-        .open()
+    let mut serial = open(&scan.serial)
         .map_err(|e| ScanError::Serial { source: e, port: scan.serial })?;
 
     let mut none = false;
