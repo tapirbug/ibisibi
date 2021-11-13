@@ -11,7 +11,7 @@ use builder::Builder;
 /// Also used for clearing the device and for querying some version information.
 ///
 /// Contents are guaranteed to be 2 bytes or longer.
-struct Record {
+pub struct Record {
     data: Vec<u8>,
 }
 
@@ -34,7 +34,7 @@ impl Record {
 }
 
 pub mod res {
-    use super::{Result, Error, calculate_checksum};
+    use super::{Result, Error, checksum};
 
     /// Verifies that a reponse from a BS210 conforms to the normal structure of a response
     /// received from BS210, that is, it starts with 0x4f, followed by a record.
@@ -42,37 +42,7 @@ pub mod res {
     /// This method is to be used where the contents are not well-understood and only the
     /// length and checksum should be verified.
     pub fn verify_response_record(buf: &[u8]) -> Result<()> {
-        if buf.len() == 0 || buf[0] != 0x4f {
-            return Err(Error::ResponseMagicNumberMissing);
-        }
-        let buf = &buf[1..];
-        if buf.len() < 2 {
-            return Err(Error::ResponseHeaderOrTrailerMissing);
-        }
-        let expected_payload_len = buf[0];
-        let payload = &buf[1..buf.len()-1];
-        if payload.len() > 0xFF {
-            return Err(Error::ResponseRecordLengthOutOfBounds {
-                len: payload.len()
-            });
-        }
-        let actual_payload_len = payload.len() as u8;
-        if actual_payload_len != expected_payload_len {
-            return Err(Error::ResponsePayloadLenMismatch {
-                expected: expected_payload_len,
-                actual: actual_payload_len
-            })
-        }
-
-        let expected_checksum = buf[buf.len() - 1];
-        let actual_checksum = calculate_checksum(payload);
-        if expected_checksum != actual_checksum {
-            return Err(Error::ResponseChecksumMismatch {
-                expected: expected_checksum,
-                actual: actual_checksum
-            });
-        }
-
+        response_payload(buf)?;
         Ok(())
     }
 
@@ -90,17 +60,134 @@ pub mod res {
         Ok(())
     }
 
+    /// Verifies response integrity and returns the payload part (without len and checksum),
+    /// if successful
+    pub fn response_payload(buf: &[u8]) -> Result<&[u8]> {
+        if buf.len() == 0 || buf[0] != 0x4f {
+            return Err(Error::ResponseMagicNumberMissing);
+        }
+        let buf = &buf[1..];
+        if buf.len() < 2 {
+            return Err(Error::ResponseHeaderOrTrailerMissing);
+        }
+
+        let received_checksum = buf[buf.len() - 1];
+        let buf = &buf[..buf.len() - 1];
+        let expected_checksum = checksum(buf);
+        if received_checksum != expected_checksum {
+            return Err(Error::ResponseChecksumMismatch {
+                expected: expected_checksum,
+                received: received_checksum
+            });
+        }
+
+        let buf_payload_len = buf[0];
+        let buf = &buf[1..];
+        if buf.len() > 0xFF {
+            return Err(Error::ResponseRecordLengthOutOfBounds {
+                len: buf.len()
+            });
+        }
+        let received_payload_len = buf.len() as u8;
+        if received_payload_len != buf_payload_len {
+            return Err(Error::ResponsePayloadLenMismatch {
+                expected: buf_payload_len,
+                received: received_payload_len
+            })
+        }
+
+        Ok(buf)
+    }
+
     #[cfg(test)]
     mod test {
-        // FIXME add tests
+        use super::*;
+
+        #[test]
+        fn ok_unknown_query_0_response() {
+            const RESPONSE: &[u8] = &[ 0x4f, 0x01, 0x57, 0xa8 ];
+            verify_response_record(RESPONSE).unwrap();
+        }
+
+        #[test]
+        fn ok_other_response_of_unknown_purpose() {
+            const RESPONSE: &[u8] = & [ 0x4f, 0x10, 0x00, 0x00, 0x02, 0x00, 0xdf, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xf7, 0xf7, 0x26 ];
+            verify_response_record(RESPONSE).unwrap();
+        }
+
+        #[test]
+        fn ok_panel_v_3_11_response() {
+            const RESPONSE: &[u8] = &[
+                0x4f, 0x10, 0x50, 0x41, 0x4e, 0x45, 0x4c, 0x20, 0x56, 0x33, 0x2e, 0x31, 0x31, 0x20, 0x20, 0x20, 0x20, 0x20, 0xa7
+            ];
+            verify_response_record(RESPONSE).unwrap();
+        }
+
+        #[test]
+        fn checksum_missing_unknown_query_0_response() {
+            const RESPONSE: &[u8] = &[ 0x4f, 0x01, 0x57 ];
+            assert_eq!(
+                verify_response_record(RESPONSE).unwrap_err(),
+                Error::ResponseChecksumMismatch { expected: 0xFF, received: 0x57 }
+            )
+        }
+
+        #[test]
+        fn checksum_failure_unknown_query_0_response() {
+            const RESPONSE: &[u8] = &[ 0x4f, 0x01, 0x57, 0xb9 ];
+            assert_eq!(
+                verify_response_record(RESPONSE).unwrap_err(),
+                Error::ResponseChecksumMismatch { expected: 0xa8, received: 0xb9 }
+            )
+        }
+
+        #[test]
+        fn ok_ack() {
+            const RESPONSE: &[u8] = &[ 0x4f ];
+            verify_ack_response(RESPONSE).unwrap();
+        }
+
+        #[test]
+        fn empty_ack() {
+            assert_eq!(
+                verify_ack_response(&[]).unwrap_err(),
+                Error::ResponseMagicNumberMissing
+            )
+        }
+
+        #[test]
+        fn corrupt_ack() {
+            const RESPONSE: &[u8] = &[ 0x5f ];
+            assert_eq!(
+                verify_ack_response(RESPONSE).unwrap_err(),
+                Error::ResponseMagicNumberMissing
+            )
+        }
+
+        #[test]
+        fn ack_with_extra_bytes() {
+            const RESPONSE: &[u8] = &[ 0x4f, 0x00 ];
+            assert_eq!(
+                verify_ack_response(RESPONSE).unwrap_err(),
+                Error::ResponseNotAcknowledgement
+            )
+        }
+
+        #[test]
+        fn empty_response() {
+            assert_eq!(
+                verify_response_record(&[]).unwrap_err(),
+                Error::ResponseMagicNumberMissing
+            )
+        }
     }
 }
 
-fn calculate_checksum(data: &[u8]) -> u8 {
-    !data.iter().cloned().fold(0, u8::wrapping_add) + 1
+fn checksum(data: &[u8]) -> u8 {
+    (!data.iter().cloned().fold(0, u8::wrapping_add)).wrapping_add(1)
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
     #[error("Record length out of bounds")]
     RecordLengthOutOfBounds,
@@ -115,15 +202,15 @@ pub enum Error {
     ResponseNotAcknowledgement,
     #[error("Response from sign is too short, missing header, trailer, or both")]
     ResponseHeaderOrTrailerMissing,
-    #[error("Response from sign corrupt, expected record length: {expected:X?}, got: {actual:X?}")]
+    #[error("Response from sign corrupt, expected record length: {expected:X?}, got: {received:X?}")]
     ResponsePayloadLenMismatch {
         expected: u8,
-        actual: u8
+        received: u8
     },
-    #[error("Response from sign corrupt, expected checksum: {expected:X?}, got: {actual:X?}")]
+    #[error("Response from sign corrupt, expected checksum: {expected:X?}, got: {received:X?}")]
     ResponseChecksumMismatch {
         expected: u8,
-        actual: u8
+        received: u8
     }
 }
 
@@ -252,11 +339,11 @@ pub mod query {
     /// Device should send back `4f` when sending this query.
     ///
     /// It is not known what the query or the response actually mean.
-    pub fn unknown_query_0() -> &'static Record {
-        const PREPARE_FLASHING_0: &Record = &Record {
+    pub fn unknown_query_0() -> Record {
+        // TODO make a lazy static
+        Record {
             data: vec![ 0x06, 0x01, 0x21, 0x00, 0x00, 0x00, 0x00, 0xd8 ]
-        };
-        PREPARE_FLASHING_0
+        }
     }
 
     /// Second record to be sent after `prepare_flashing_0`.
@@ -264,11 +351,10 @@ pub mod query {
     /// Device should send back `4f 01 57 a8` when sending this query.
     ///
     /// It is not known what the query or the response actually mean.
-    pub fn unknown_query_1() -> &'static Record {
-        const PREPARE_FLASHING_1: &Record = &Record {
+    pub fn unknown_query_1() -> Record {
+        Record {
             data: vec![ 0x04, 0x08, 0x00, 0x20, 0x01, 0xd3 ]
-        };
-        PREPARE_FLASHING_1
+        }
     }
 
     #[cfg(test)]
@@ -319,7 +405,7 @@ pub mod query {
 
 mod builder {
     use std::mem::take;
-    use super::{Record, calculate_checksum, Result, Error};
+    use super::{Record, checksum, Result, Error};
 
     pub struct Builder {
         data: Vec<u8>
@@ -362,7 +448,7 @@ mod builder {
 
             let mut data = take(&mut self.data);
             data[0] = payload_len; // first byte is length, excluding both length byte itself and checksum
-            data.push(calculate_checksum(&data));
+            data.push(checksum(&data));
 
             debug_assert!(data.len() >= 2, "When constructed through new, assumed that the length is always 2 or more");
             let record = Record { data };
