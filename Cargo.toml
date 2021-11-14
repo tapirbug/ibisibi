@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 argh = "0.1.5"
 ihex = "3.0.0"
+lazy_static = "1.4.0"
 serde_yaml = "0.8.20"
 serialport = "4.0.1"
 thiserror = "1.0.26"

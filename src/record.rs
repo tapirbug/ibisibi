@@ -333,17 +333,25 @@ pub mod query {
     //! talking to behaves like a BS210 sign.
 
     use super::Record;
+    use lazy_static::lazy_static;
+
+    lazy_static! {
+        static ref UNKNOWN_QUERY_0 : Record = Record {
+            data: vec![ 0x06, 0x01, 0x21, 0x00, 0x00, 0x00, 0x00, 0xd8 ]
+        };
+
+        static ref UNKNOWN_QUERY_1 : Record = Record {
+            data: vec![ 0x04, 0x08, 0x00, 0x20, 0x01, 0xd3 ]
+        };
+    }
 
     /// First record to be sent after selecting the address.
     ///
     /// Device should send back `4f` when sending this query.
     ///
     /// It is not known what the query or the response actually mean.
-    pub fn unknown_query_0() -> Record {
-        // TODO make a lazy static
-        Record {
-            data: vec![ 0x06, 0x01, 0x21, 0x00, 0x00, 0x00, 0x00, 0xd8 ]
-        }
+    pub fn unknown_query_0() -> &'static Record {
+        &UNKNOWN_QUERY_0
     }
 
     /// Second record to be sent after `prepare_flashing_0`.
@@ -351,10 +359,8 @@ pub mod query {
     /// Device should send back `4f 01 57 a8` when sending this query.
     ///
     /// It is not known what the query or the response actually mean.
-    pub fn unknown_query_1() -> Record {
-        Record {
-            data: vec![ 0x04, 0x08, 0x00, 0x20, 0x01, 0xd3 ]
-        }
+    pub fn unknown_query_1() -> &'static Record {
+        &UNKNOWN_QUERY_1
     }
 
     #[cfg(test)]

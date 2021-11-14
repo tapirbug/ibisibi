@@ -140,6 +140,7 @@ dependencies = [
  "argh",
  "chrono",
  "ihex",
+ "lazy_static",
  "serde",
  "serde_yaml",
  "serialport",
