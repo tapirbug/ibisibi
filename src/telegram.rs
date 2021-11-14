@@ -5,12 +5,17 @@
 //! called "Datensatz" in german, e.g. DS003.
 
 use builder::Builder;
-use std::fmt;
-use std::str::from_utf8;
+use std::{
+    fmt,
+    str::from_utf8
+};
+
+pub use parse::TelegramParseError;
 
 /// A telegram in the IBIS protocol, binary, including trailing carriage return
 /// and checksum. The contained data is guaranteed to be a valid telegram
-/// that can be sent over the bus.
+/// that can be sent over the bus or that has been received over the bus and is
+/// valid.
 ///
 /// For example, [Telegram::destination(u8)][Telegram::destination(u8)]
 /// produces the DS003 telegram.
@@ -138,6 +143,12 @@ impl Telegram {
             .finish()
     }
 
+    /// Gets the telegram payload, that is, the part before CR and the checksum.
+    /// If the message has a prefix, that will be included in the returned payload.
+    pub fn payload(&self) -> &[u8] {
+        &self.0[..self.0.len() - 2]
+    }
+
     /// Gets the telegram as an immutable sequence of bytes, including carriage return
     /// and parity byte.
     pub fn as_bytes(&self) -> &[u8] {
@@ -225,6 +236,122 @@ mod builder {
     }
 }
 
+mod parse {
+    use crate::parity::parity_byte;
+    use super::Telegram;
+    use std::convert::TryFrom;
+    use thiserror::Error;
+
+    #[derive(Debug, Error, PartialEq, Eq)]
+    pub enum TelegramParseError {
+        #[error("Received unexpected IBIS response checksum {received}, expected {expected}")]
+        Parity {
+            expected: u8,
+            received :u8
+        },
+        #[error("Received IBIS response that does not conform to the expected format with carriage return and parity byte")]
+        Malformed
+    }
+
+    impl<'a> TryFrom<&'a [u8]> for Telegram {
+        type Error = TelegramParseError;
+
+        fn try_from(buf: &'a [u8]) -> Result<Self, Self::Error> {
+            if buf.len() < 2 || buf[buf.len() - 2] != b'\r' {
+                return Err(TelegramParseError::Malformed);
+            }
+
+            let expected_parity = parity_byte(&buf[..buf.len() - 1]);
+            let received_parity = buf[buf.len() - 1];
+
+            if expected_parity != received_parity {
+                return Err(TelegramParseError::Parity {
+                    expected: expected_parity,
+                    received: received_parity
+                });
+            }
+
+            Ok(Telegram(buf.into()))
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use std::convert::TryInto;
+
+        #[test]
+        fn status_query_response() {
+            const RECEIVED : &[u8] = &[
+                0x61, 0x30, 0x0d, 0x23
+            ];
+            let parsed : Telegram = RECEIVED.try_into().unwrap();
+            assert_eq!(
+                &parsed.0[..],
+                RECEIVED
+            );
+        }
+
+        #[test]
+        fn version_query_response() {
+            const RECEIVED : &[u8] = &[
+                0x61, 0x56, 0x56, 0x32, 0x2e, 0x33, 0x52, 0x69, 0x67, 0x61, 0x42, 0x2f, 0x48, 0x37, 0x2f, 0x39, 0x39, 0x0d, 0x3c
+            ];
+            let parsed : Telegram = RECEIVED.try_into().unwrap();
+            assert_eq!(
+                &parsed.0[..],
+                RECEIVED
+            );
+        }
+
+        #[test]
+        fn empty() {
+            const RECEIVED : &[u8] = &[];
+            let error : TelegramParseError = Telegram::try_from(RECEIVED).unwrap_err();
+            assert_eq!(
+                error,
+                TelegramParseError::Malformed
+            );
+        }
+
+        #[test]
+        fn empty_payload_with_missing_checksum() {
+            const RECEIVED : &[u8] = b"\r";
+            let error : TelegramParseError = Telegram::try_from(RECEIVED).unwrap_err();
+            assert_eq!(
+                error,
+                TelegramParseError::Malformed
+            );
+        }
+
+        #[test]
+        fn empty_payload_with_incorrect_checksum() {
+            const RECEIVED : &[u8] = &[ b'\r', 0x42 ];
+            let error : TelegramParseError = Telegram::try_from(RECEIVED).unwrap_err();
+            assert_eq!(
+                error,
+                TelegramParseError::Parity {
+                    expected: 0x7F ^ b'\r',
+                    received: 0x42
+                }
+            );
+        }
+
+        #[test]
+        fn non_empty_payload_with_incorrect_checksum() {
+            const RECEIVED : &[u8] = &[ 0x11, b'\r', 0x42 ];
+            let error : TelegramParseError = Telegram::try_from(RECEIVED).unwrap_err();
+            assert_eq!(
+                error,
+                TelegramParseError::Parity {
+                    expected: 0x7F ^ 0x11 ^ b'\r',
+                    received: 0x42
+                }
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -257,6 +384,10 @@ mod test {
     fn destination_0() {
         let telegram = Telegram::destination(0);
         assert_eq!(
+            telegram.payload(),
+            b"z000"
+        );
+        assert_eq!(
             telegram.as_bytes(),
             &[
                 b'z',
@@ -272,6 +403,10 @@ mod test {
     #[test]
     fn destination_1() {
         let telegram = Telegram::destination(1);
+        assert_eq!(
+            telegram.payload(),
+            b"z001"
+        );
         assert_eq!(
             telegram.as_bytes(),
             &[
@@ -289,6 +424,10 @@ mod test {
     fn destination_31() {
         let telegram = Telegram::destination(31);
         assert_eq!(
+            telegram.payload(),
+            b"z031"
+        );
+        assert_eq!(
             telegram.as_bytes(),
             &[
                 b'z',
@@ -304,6 +443,10 @@ mod test {
     #[test]
     fn destination_938() {
         let telegram = Telegram::destination(938);
+        assert_eq!(
+            telegram.payload(),
+            b"z938"
+        );
         assert_eq!(
             telegram.as_bytes(),
             &[
@@ -349,8 +492,12 @@ mod test {
     }
 
     #[test]
-    fn display_version_one() {
+    fn display_version_of_address_one() {
         let telegram = Telegram::display_version(1);
+        assert_eq!(
+            telegram.payload(),
+            b"aV1"
+        );
         let telegram = &format!("{:?}", telegram);
         assert_eq!(telegram, "aV1<CR><P:74>");
     }
@@ -365,6 +512,10 @@ mod test {
     #[test]
     fn display_status_zero() {
         let telegram = Telegram::display_status(0);
+        assert_eq!(
+            telegram.payload(),
+            b"a0"
+        );
         let telegram = &format!("{:?}", telegram);
         assert_eq!(telegram, "a0<CR><P:23>");
     }
@@ -372,6 +523,11 @@ mod test {
     #[test]
     fn select_address_1() {
         let telegram = Telegram::bs_select_address(1);
+        assert_eq!(
+            telegram.payload(),
+            &[0x0d, 0x72, 0x1b, 0x53, 0x31],
+            "Payload of messages with prefix should include the prefix"
+        );
         assert_eq!(
             telegram.as_bytes(),
             &[0x0d, 0x72, 0x1b, 0x53, 0x31, 0x0d, 0x0b]
