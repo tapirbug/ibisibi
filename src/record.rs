@@ -343,6 +343,18 @@ pub mod query {
         static ref UNKNOWN_QUERY_1 : Record = Record {
             data: vec![ 0x04, 0x08, 0x00, 0x20, 0x01, 0xd3 ]
         };
+
+        static ref UNKNOWN_QUERY_2 : Record = Record {
+            data: vec![ 0x04, 0x08, 0xd0, 0x1f, 0x10, 0xf5 ]
+        };
+
+        static ref PANEL_VERSION : Record = Record {
+            data: vec![ 0x04, 0x08, 0xd0, 0x9f, 0x10, 0x75 ]
+        };
+
+        static ref UNKNOWN_QUERY_3 : Record = Record {
+            data: vec![ 0x01, 0x0f, 0xf0 ]
+        };
     }
 
     /// First record to be sent after selecting the address.
@@ -354,13 +366,45 @@ pub mod query {
         &UNKNOWN_QUERY_0
     }
 
-    /// Second record to be sent after `prepare_flashing_0`.
+    /// Second record to be sent after selecting the address.
     ///
     /// Device should send back `4f 01 57 a8` when sending this query.
     ///
     /// It is not known what the query or the response actually mean.
     pub fn unknown_query_1() -> &'static Record {
         &UNKNOWN_QUERY_1
+    }
+
+    /// Third record to be sent after selecting the address.
+    ///
+    /// Device should send back
+    /// `4f 10 00 00 02 00 df ff ff ff 00 00 00 00 ff ff f7 f7 26`
+    /// when sending this query.
+    ///
+    /// It is not known what the query or the response actually mean, but
+    /// since the payload differs only in one byte from the panel version
+    /// query, it would seem that this also tells us something about the
+    /// device.
+    pub fn unknown_query_2() -> &'static Record {
+        &UNKNOWN_QUERY_2
+    }
+
+    /// Seems to request some kind of version from the flipdot display,
+    /// because the observed payload of the response is `b"PANEL V3.11     "`.
+    ///
+    /// As always, it is unclear what it means to have panel version 3.11.
+    pub fn panel_version() -> &'static Record {
+        &PANEL_VERSION
+    }
+
+    /// Fifth record to be sent after selecting the address, that is, after
+    /// querying the panel version.
+    ///
+    /// The response seems to be a simple `4f` acknowledgement.
+    ///
+    /// It is not known what the query or the response actually mean.
+    pub fn unknown_query_3() -> &'static Record {
+        &UNKNOWN_QUERY_3
     }
 
     #[cfg(test)]
@@ -392,6 +436,24 @@ pub mod query {
         #[test]
         fn unknown_query_1_integrity() {
             let static_unkown_query = unknown_query_1();
+            let calculated_unknown_query = Builder::new()
+                .buf(static_unkown_query.payload())
+                .build()
+                .unwrap();
+
+            assert_eq!(
+                static_unkown_query.checksum(),
+                calculated_unknown_query.checksum()
+            );
+            assert_eq!(
+                static_unkown_query.as_bytes(),
+                calculated_unknown_query.as_bytes()
+            );
+        }
+
+        #[test]
+        fn unknown_query_2_integrity() {
+            let static_unkown_query = unknown_query_2();
             let calculated_unknown_query = Builder::new()
                 .buf(static_unkown_query.payload())
                 .build()
