@@ -115,6 +115,7 @@ impl Telegram {
     ///
     /// # Panics
     /// This function panics if the address is higher than 15.
+    #[cfg(test)]
     pub fn display_version(address: u8) -> Telegram {
         assert!(
             address <= 15,
@@ -148,6 +149,7 @@ impl Telegram {
 
     /// Gets the telegram payload, that is, the part before CR and the checksum.
     /// If the message has a prefix, that will be included in the returned payload.
+    #[cfg(test)]
     pub fn payload(&self) -> &[u8] {
         &self.0[..self.0.len() - 2]
     }
