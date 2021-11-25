@@ -14,19 +14,19 @@ mod test {
     fn empty_parity() {
         let parity = parity_byte(&[]);
         assert_eq!(
-            parity,
-            0x7F,
-            "Unexpected parity of empty message, got {:X?}", parity
+            parity, 0x7F,
+            "Unexpected parity of empty message, got {:X?}",
+            parity
         )
     }
 
     #[test]
     fn carriage_return_parity() {
-        let parity = parity_byte(&[ b'\r' ]);
+        let parity = parity_byte(&[b'\r']);
         assert_eq!(
-            parity,
-            0x72,
-            "Unexpected checksum of message consisiting only of terminating CR, got: {:X?}", parity
+            parity, 0x72,
+            "Unexpected checksum of message consisiting only of terminating CR, got: {:X?}",
+            parity
         )
     }
 

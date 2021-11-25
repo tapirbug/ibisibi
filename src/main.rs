@@ -13,10 +13,10 @@ mod range;
 mod record;
 mod run;
 mod scan;
+mod serial;
 mod slot;
 mod status;
 mod telegram;
-mod serial;
 
 fn main() -> Result<(), String> {
     // a builder for `FmtSubscriber`.
@@ -27,8 +27,7 @@ fn main() -> Result<(), String> {
         // completes the builder.
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let args: args::TopLevel = argh::from_env();
     run::run(args.invocation)

@@ -1,12 +1,9 @@
+use serialport::Result;
 #[cfg(not(test))]
 use serialport::{new, DataBits, Parity, StopBits};
 #[cfg(not(test))]
 use std::time::Duration;
-use std::{
-    borrow::Cow,
-    convert::Into
-};
-use serialport::Result;
+use std::{borrow::Cow, convert::Into};
 
 #[cfg(not(test))]
 const TIMEOUT_SECS: u64 = 3;
@@ -23,7 +20,10 @@ pub type Serial = Box<dyn serialport::SerialPort>;
 pub type Serial = mock::MockSerial;
 
 #[cfg(not(test))]
-pub fn open<'a, D>(device: D) -> Result<Serial> where D : Into<Cow<'a, str>> {
+pub fn open<'a, D>(device: D) -> Result<Serial>
+where
+    D: Into<Cow<'a, str>>,
+{
     new(device, 1200)
         .data_bits(DataBits::Seven)
         .stop_bits(StopBits::Two)
@@ -33,33 +33,38 @@ pub fn open<'a, D>(device: D) -> Result<Serial> where D : Into<Cow<'a, str>> {
 }
 
 #[cfg(test)]
-pub fn open<'a, D>(_device: D) -> Result<Serial> where D : Into<Cow<'a, str>> {
+pub fn open<'a, D>(_device: D) -> Result<Serial>
+where
+    D: Into<Cow<'a, str>>,
+{
     todo!("mocking of open function for test currently not needed")
 }
 
 #[cfg(test)]
 mod mock {
     use std::{
-        io::{Read, Write, Error, ErrorKind, Result},
-        mem::replace
+        io::{Error, ErrorKind, Read, Result, Write},
+        mem::replace,
     };
 
     pub struct MockSerial {
-        read_results: Vec<ReadResult>
+        read_results: Vec<ReadResult>,
     }
 
     impl Read for MockSerial {
         fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
             if self.read_results.is_empty() {
                 // no more mock responses were configured, likely an error in the test setup
-                panic!("No more mock interactions were planned, but mock serial has been read again")
+                panic!(
+                    "No more mock interactions were planned, but mock serial has been read again"
+                )
             }
 
             match self.read_results[0] {
                 ReadResult::Timeout => {
                     self.read_results.remove(0);
                     Err(Error::from(ErrorKind::TimedOut))
-                },
+                }
                 ReadResult::Data(ref mut first) => {
                     let first_len = first.len();
                     let first = if first_len <= buf.len() {
@@ -76,7 +81,7 @@ mod mock {
                     // unwrap the removed read result again
                     let first = match first {
                         ReadResult::Data(data) => data,
-                        _ => unreachable!()
+                        _ => unreachable!(),
                     };
 
                     // write first vector or part of first vector,
@@ -105,19 +110,19 @@ mod mock {
     #[derive(Clone)]
     enum ReadResult {
         Data(Vec<u8>),
-        Timeout
+        Timeout,
     }
 
     impl MockSerial {
         pub fn builder() -> Builder {
             Builder {
-                read_results: vec![]
+                read_results: vec![],
             }
         }
     }
 
     pub struct Builder {
-        read_results: Vec<ReadResult>
+        read_results: Vec<ReadResult>,
     }
 
     impl Builder {
@@ -140,7 +145,7 @@ mod mock {
         /// Can safely be called multiple times.
         pub fn build(&self) -> MockSerial {
             MockSerial {
-                read_results: self.read_results.clone()
+                read_results: self.read_results.clone(),
             }
         }
     }

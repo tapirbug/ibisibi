@@ -1,11 +1,7 @@
-use crate::{
-    serial::Serial,
-    telegram::Telegram,
-    parity::parity_byte
-};
-use thiserror::Error;
+use crate::{parity::parity_byte, serial::Serial, telegram::Telegram};
+use std::fmt::{self, Display, Formatter};
 use std::io::{Read, Write};
-use std::fmt::{self, Formatter, Display};
+use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -23,8 +19,8 @@ pub fn status(serial: &mut Serial, address: u8) -> Result<Status> {
     if received_checksum != expected_checksum {
         return Err(Error::Parity {
             expected: expected_checksum,
-            got: received_checksum
-        })
+            got: received_checksum,
+        });
     }
 
     let status_char = response[1];
@@ -48,7 +44,7 @@ pub enum Status {
     /// value of the unknown status as sent over the wire, so presumably
     /// `b'1'`, `b'2'`, or `b'4'` onwards, that is, the ASCII digit is not
     /// converted to a number.
-    Uncategorized(u8)
+    Uncategorized(u8),
 }
 
 impl From<u8> for Status {
@@ -56,7 +52,7 @@ impl From<u8> for Status {
         match status_byte {
             b'0' => Status::ReadyForData,
             b'3' => Status::Ok,
-            other => Status::Uncategorized(other)
+            other => Status::Uncategorized(other),
         }
     }
 }
@@ -84,7 +80,7 @@ impl Error {
     pub fn is_timed_out(&self) -> bool {
         match self {
             Error::IO(err) if err.kind() == std::io::ErrorKind::TimedOut => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -95,37 +91,30 @@ mod test {
 
     #[test]
     fn timeout() {
-        let mut serial = Serial::builder()
-                .time_out()
-                .build();
+        let mut serial = Serial::builder().time_out().build();
 
         let err = status(&mut serial, 0).unwrap_err();
 
-        assert!(
-            err.is_timed_out(),
-            "Expected timeout error"
-        )
+        assert!(err.is_timed_out(), "Expected timeout error")
     }
 
     #[test]
     fn checksum_err() {
         let mut serial = Serial::builder()
-                .receive(b"a0\r0") // correct checksum would be #, not 0
-                .build();
+            .receive(b"a0\r0") // correct checksum would be #, not 0
+            .build();
 
         let err = status(&mut serial, 0).unwrap_err();
 
         match err {
             Error::Parity { .. } => {}
-            err => panic!("Unexpected error: {:?}", err)
+            err => panic!("Unexpected error: {:?}", err),
         }
     }
 
     #[test]
     fn ok() {
-        let mut serial = Serial::builder()
-                .receive(b"a3\r ")
-                .build();
+        let mut serial = Serial::builder().receive(b"a3\r ").build();
 
         let status = status(&mut serial, 0).unwrap();
 
@@ -138,9 +127,7 @@ mod test {
 
     #[test]
     fn ready_for_data() {
-        let mut serial = Serial::builder()
-                .receive(b"a0\r#")
-                .build();
+        let mut serial = Serial::builder().receive(b"a0\r#").build();
 
         let status = status(&mut serial, 9).unwrap();
 
@@ -153,9 +140,7 @@ mod test {
 
     #[test]
     fn uncategorized_status() {
-        let mut serial = Serial::builder()
-                .receive(b"a7\r$")
-                .build();
+        let mut serial = Serial::builder().receive(b"a7\r$").build();
 
         let status = status(&mut serial, 8).unwrap();
 

@@ -1,26 +1,32 @@
 use crate::{
     args::Flash,
-    serial::{self, Serial},
-    telegram::Telegram,
     record::{db::DatabaseChunk, query, res},
-    status::status
-};
-use thiserror::Error;
-use std::{
-    io::{Read, Write},
-    fs::read_to_string
+    serial::{self, Serial},
+    status::status,
+    telegram::Telegram,
 };
 use ihex::{Reader, Record};
+use std::{
+    fs::read_to_string,
+    io::{Read, Write},
+};
+use thiserror::Error;
 use tracing::{debug, warn};
 
 pub type Result<T> = std::result::Result<T, FlashError>;
 
 #[tracing::instrument]
 pub fn flash(opts: Flash) -> Result<()> {
-    let Flash { address, sign_db_hex, serial } = opts;
+    let Flash {
+        address,
+        sign_db_hex,
+        serial,
+    } = opts;
 
-    let mut serial = serial::open(&serial)
-        .map_err(|e| FlashError::Serial { source: e, port: serial.clone() })?;
+    let mut serial = serial::open(&serial).map_err(|e| FlashError::Serial {
+        source: e,
+        port: serial.clone(),
+    })?;
 
     // Check device status first and print it as debug output,
     // if there are any hickups with that we abort early
@@ -31,7 +37,7 @@ pub fn flash(opts: Flash) -> Result<()> {
     clear_database(&mut serial)?;
     flash_database(
         &mut serial,
-        Reader::new(&read_to_string(sign_db_hex).map_err(FlashError::DbRead)?)
+        Reader::new(&read_to_string(sign_db_hex).map_err(FlashError::DbRead)?),
     )?;
 
     Ok(())
@@ -47,9 +53,7 @@ pub fn dump_status(serial: &mut Serial, address: u8) -> Result<()> {
 #[tracing::instrument(skip(serial))]
 fn select_address(serial: &mut Serial, address: u8) -> Result<()> {
     // r.S1 (select address?)
-    serial.write(
-        Telegram::bs_select_address(address).as_bytes()
-    )?;
+    serial.write(Telegram::bs_select_address(address).as_bytes())?;
     // no response expected
     Ok(())
 }
@@ -59,32 +63,27 @@ pub fn clear_database(serial: &mut Serial) -> Result<()> {
     let mut buf = [0_u8; 4];
 
     debug!("Preparing clearing (0)");
-    serial.write(
-        query::prepare_clear_0().as_bytes()
-    )?;
+    serial.write(query::prepare_clear_0().as_bytes())?;
     serial.read_exact(&mut buf[0..1])?;
     res::verify_ack_response(&buf[0..1]).map_err(FlashError::PrepareClear0)?;
 
     debug!("Preparing clearing (1)");
-    const EXPECTED_QUERY_1_RESPONSE: &[u8] = &[ 0x57 ];
-    serial.write(
-        query::prepare_clear_1().as_bytes()
-    )?;
+    const EXPECTED_QUERY_1_RESPONSE: &[u8] = &[0x57];
+    serial.write(query::prepare_clear_1().as_bytes())?;
     serial.read_exact(&mut buf[..])?;
-    let unknown_query_1_response = res::response_payload(&buf[..]).map_err(FlashError::PrepareClear1CorruptResponse)?;
+    let unknown_query_1_response =
+        res::response_payload(&buf[..]).map_err(FlashError::PrepareClear1CorruptResponse)?;
     if unknown_query_1_response != EXPECTED_QUERY_1_RESPONSE {
         return Err(FlashError::PrepareClear1);
     }
 
     for i in 0..4 {
         debug!("Clearing ({})", i);
-        serial.write(
-            query::clear().as_bytes()
-        )?;
+        serial.write(query::clear().as_bytes())?;
         serial.read_exact(&mut buf[0..1])?;
         let response = buf[0];
         if response != b'E' {
-            return Err(FlashError::Clear(response))
+            return Err(FlashError::Clear(response));
         }
     }
 
@@ -120,18 +119,20 @@ pub fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
                 );
 
                 serial.write(
-                    DatabaseChunk::new(write_offset, &data).map_err(FlashError::DbRecordTooLong)?.as_bytes()
+                    DatabaseChunk::new(write_offset, &data)
+                        .map_err(FlashError::DbRecordTooLong)?
+                        .as_bytes(),
                 )?;
 
                 serial.read_exact(&mut buf)?;
                 res::verify_ack_response(&buf).map_err(FlashError::FlashChunkNotAcknowledged)?;
 
                 write_offset += 0x20;
-            },
+            }
             Record::EndOfFile => {
                 eof_found = true;
-            },
-            _ => return Err(FlashError::DbUnexpectedRecordType)
+            }
+            _ => return Err(FlashError::DbUnexpectedRecordType),
         }
     }
 
@@ -161,11 +162,15 @@ pub enum FlashError {
     DbCorrupt(#[from] ihex::ReaderError),
     #[error("Failed to read sign database, error: {0}")]
     DbRecordTooLong(crate::record::Error),
-    #[error("Failed to read sign database, error: unrecognized format, found unexpected record type")]
+    #[error(
+        "Failed to read sign database, error: unrecognized format, found unexpected record type"
+    )]
     DbUnexpectedRecordType,
     #[error("Database record sent, but device failed to send acknowledgement: {0}")]
     FlashChunkNotAcknowledged(crate::record::Error),
-    #[error("Flashing could not be finished, unexpected repsonse from device at finsihing step 0: {0}")]
+    #[error(
+        "Flashing could not be finished, unexpected repsonse from device at finsihing step 0: {0}"
+    )]
     FinishFlash0(crate::record::Error),
     #[error("Could not open serial port connection to: {port}, due to error: {source}")]
     Serial {

@@ -1,8 +1,8 @@
 pub type Result<T> = std::result::Result<T, Error>;
 pub use db::DatabaseChunk;
 
-use thiserror::Error;
 use builder::Builder;
+use thiserror::Error;
 
 /// A chunk of a record database that corresponds to a single line in a sign database
 /// of a BS210 sign, but in a different format that is understood by the sign when
@@ -26,7 +26,7 @@ impl Record {
     /// Record data excluding the first (length) and last (checksum) bytes.
     #[cfg(test)]
     pub fn payload(&self) -> &[u8] {
-        &self.data[1..self.data.len()-1]
+        &self.data[1..self.data.len() - 1]
     }
 
     #[cfg(test)]
@@ -36,7 +36,7 @@ impl Record {
 }
 
 pub mod res {
-    use super::{Result, Error, checksum};
+    use super::{checksum, Error, Result};
 
     /// Verifies that the given buffer holds an acknowledgement response without an attached
     /// record, that is 0x4F.
@@ -45,7 +45,7 @@ pub mod res {
             return Err(Error::ResponseMagicNumberMissing);
         }
 
-        if buf != &[ 0x4f ] {
+        if buf != &[0x4f] {
             return Err(Error::ResponseNotAcknowledgement);
         }
 
@@ -71,23 +71,21 @@ pub mod res {
         if received_checksum != expected_checksum {
             return Err(Error::ResponseChecksumMismatch {
                 expected: expected_checksum,
-                received: received_checksum
+                received: received_checksum,
             });
         }
 
         let buf_payload_len = buf[0];
         let buf = &buf[1..];
         if buf.len() > 0xFF {
-            return Err(Error::ResponseRecordLengthOutOfBounds {
-                len: buf.len()
-            });
+            return Err(Error::ResponseRecordLengthOutOfBounds { len: buf.len() });
         }
         let received_payload_len = buf.len() as u8;
         if received_payload_len != buf_payload_len {
             return Err(Error::ResponsePayloadLenMismatch {
                 expected: buf_payload_len,
-                received: received_payload_len
-            })
+                received: received_payload_len,
+            });
         }
 
         Ok(buf)
@@ -99,45 +97,55 @@ pub mod res {
 
         #[test]
         fn ok_unknown_query_0_response() {
-            const RESPONSE: &[u8] = &[ 0x4f, 0x01, 0x57, 0xa8 ];
+            const RESPONSE: &[u8] = &[0x4f, 0x01, 0x57, 0xa8];
             response_payload(RESPONSE).unwrap();
         }
 
         #[test]
         fn ok_other_response_of_unknown_purpose() {
-            const RESPONSE: &[u8] = & [ 0x4f, 0x10, 0x00, 0x00, 0x02, 0x00, 0xdf, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xf7, 0xf7, 0x26 ];
+            const RESPONSE: &[u8] = &[
+                0x4f, 0x10, 0x00, 0x00, 0x02, 0x00, 0xdf, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
+                0xff, 0xff, 0xf7, 0xf7, 0x26,
+            ];
             response_payload(RESPONSE).unwrap();
         }
 
         #[test]
         fn ok_panel_v_3_11_response() {
             const RESPONSE: &[u8] = &[
-                0x4f, 0x10, 0x50, 0x41, 0x4e, 0x45, 0x4c, 0x20, 0x56, 0x33, 0x2e, 0x31, 0x31, 0x20, 0x20, 0x20, 0x20, 0x20, 0xa7
+                0x4f, 0x10, 0x50, 0x41, 0x4e, 0x45, 0x4c, 0x20, 0x56, 0x33, 0x2e, 0x31, 0x31, 0x20,
+                0x20, 0x20, 0x20, 0x20, 0xa7,
             ];
             response_payload(RESPONSE).unwrap();
         }
 
         #[test]
         fn checksum_missing_unknown_query_0_response() {
-            const RESPONSE: &[u8] = &[ 0x4f, 0x01, 0x57 ];
+            const RESPONSE: &[u8] = &[0x4f, 0x01, 0x57];
             assert_eq!(
                 response_payload(RESPONSE).unwrap_err(),
-                Error::ResponseChecksumMismatch { expected: 0xFF, received: 0x57 }
+                Error::ResponseChecksumMismatch {
+                    expected: 0xFF,
+                    received: 0x57
+                }
             )
         }
 
         #[test]
         fn checksum_failure_unknown_query_0_response() {
-            const RESPONSE: &[u8] = &[ 0x4f, 0x01, 0x57, 0xb9 ];
+            const RESPONSE: &[u8] = &[0x4f, 0x01, 0x57, 0xb9];
             assert_eq!(
                 response_payload(RESPONSE).unwrap_err(),
-                Error::ResponseChecksumMismatch { expected: 0xa8, received: 0xb9 }
+                Error::ResponseChecksumMismatch {
+                    expected: 0xa8,
+                    received: 0xb9
+                }
             )
         }
 
         #[test]
         fn ok_ack() {
-            const RESPONSE: &[u8] = &[ 0x4f ];
+            const RESPONSE: &[u8] = &[0x4f];
             verify_ack_response(RESPONSE).unwrap();
         }
 
@@ -151,7 +159,7 @@ pub mod res {
 
         #[test]
         fn corrupt_ack() {
-            const RESPONSE: &[u8] = &[ 0x5f ];
+            const RESPONSE: &[u8] = &[0x5f];
             assert_eq!(
                 verify_ack_response(RESPONSE).unwrap_err(),
                 Error::ResponseMagicNumberMissing
@@ -160,7 +168,7 @@ pub mod res {
 
         #[test]
         fn ack_with_extra_bytes() {
-            const RESPONSE: &[u8] = &[ 0x4f, 0x00 ];
+            const RESPONSE: &[u8] = &[0x4f, 0x00];
             assert_eq!(
                 verify_ack_response(RESPONSE).unwrap_err(),
                 Error::ResponseNotAcknowledgement
@@ -186,9 +194,7 @@ pub enum Error {
     #[error("Record length out of bounds")]
     RecordLengthOutOfBounds,
     #[error("Response from sign has length that is out of bounds: {len}")]
-    ResponseRecordLengthOutOfBounds {
-        len: usize
-    },
+    ResponseRecordLengthOutOfBounds { len: usize },
     #[error("Response from sign corrupt, lacking magic number")]
     ResponseMagicNumberMissing,
     /// Expected a response holding just the magic number, but got a complex response.
@@ -196,20 +202,16 @@ pub enum Error {
     ResponseNotAcknowledgement,
     #[error("Response from sign is too short, missing header, trailer, or both")]
     ResponseHeaderOrTrailerMissing,
-    #[error("Response from sign corrupt, expected record length: {expected:X?}, got: {received:X?}")]
-    ResponsePayloadLenMismatch {
-        expected: u8,
-        received: u8
-    },
+    #[error(
+        "Response from sign corrupt, expected record length: {expected:X?}, got: {received:X?}"
+    )]
+    ResponsePayloadLenMismatch { expected: u8, received: u8 },
     #[error("Response from sign corrupt, expected checksum: {expected:X?}, got: {received:X?}")]
-    ResponseChecksumMismatch {
-        expected: u8,
-        received: u8
-    }
+    ResponseChecksumMismatch { expected: u8, received: u8 },
 }
 
 pub mod db {
-    use super::{Record, Result, Error, Builder};
+    use super::{Builder, Error, Record, Result};
 
     /// A record that represents a chunk from the line database, on the granularity of
     /// a single IHEX record, which can be sent over the wire for flashing of a flipdot
@@ -332,36 +334,30 @@ pub mod query {
     use lazy_static::lazy_static;
 
     lazy_static! {
-        static ref PREPARE_CLEAR_0 : Record = Record {
-            data: vec![ 0x06, 0x01, 0x21, 0x00, 0x00, 0x00, 0x00, 0xd8 ]
+        static ref PREPARE_CLEAR_0: Record = Record {
+            data: vec![0x06, 0x01, 0x21, 0x00, 0x00, 0x00, 0x00, 0xd8]
         };
-
-        static ref PREPARE_CLEAR_1 : Record = Record {
-            data: vec![ 0x04, 0x08, 0x00, 0x20, 0x01, 0xd3 ]
+        static ref PREPARE_CLEAR_1: Record = Record {
+            data: vec![0x04, 0x08, 0x00, 0x20, 0x01, 0xd3]
         };
-
-        static ref CLEAR : Record = Record {
+        static ref CLEAR: Record = Record {
             data: vec![
-                0x23, 0x03, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-                0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-                0x01, 0x01, 0x01, 0x01, 0xba,
+                0x23, 0x03, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0xba,
             ]
         };
-
-        static ref FINISH_CLEAR_0 : Record = Record {
-            data: vec![ 0x05, 0x05, 0x00, 0x00, 0x00, 0x00, 0xf6 ]
+        static ref FINISH_CLEAR_0: Record = Record {
+            data: vec![0x05, 0x05, 0x00, 0x00, 0x00, 0x00, 0xf6]
         };
-
-        static ref FINISH_CLEAR_1 : Record = Record {
-            data: vec![ 0x02, 0x07, 0x00, 0xf7 ]
+        static ref FINISH_CLEAR_1: Record = Record {
+            data: vec![0x02, 0x07, 0x00, 0xf7]
         };
-
-        static ref FINISH_FLASH_0 : Record = Record {
-            data: vec![ 0x02, 0x15, 0x55, 0x94 ]
+        static ref FINISH_FLASH_0: Record = Record {
+            data: vec![0x02, 0x15, 0x55, 0x94]
         };
-
-        static ref FINISH_FLASH_1 : Record = Record {
-            data: vec![ 0x01, 0x0f, 0xf0 ]
+        static ref FINISH_FLASH_1: Record = Record {
+            data: vec![0x01, 0x0f, 0xf0]
         };
     }
 
@@ -381,7 +377,7 @@ pub mod query {
     ///
     /// It is not known what the query or the response actually mean, but it was sent in all
     /// observed runs of the flashing.
-    /// 
+    ///
     /// After this we see in the logs that we disconnect and connect again, maybe to change
     /// baudrate. Not known if this reconnecting is necessary.
     pub fn prepare_clear_1() -> &'static Record {
@@ -389,9 +385,9 @@ pub mod query {
     }
 
     /// Sent four times after `prepare_clear_1`.
-    /// 
+    ///
     /// Each time we expect a repsonse of 0x45 (E).
-    /// 
+    ///
     /// Why the exact same message is sent four times is not known. Maybe this is supposed
     /// to overwrite four consecutive blocks but an implementation error causes it to clear
     /// the same block over and over?
@@ -440,8 +436,8 @@ pub mod query {
 
     #[cfg(test)]
     mod test {
-        use super::*;
         use super::super::Builder;
+        use super::*;
 
         /// Since length and checksum are handcoded, we need to make sure that
         /// we wrote everything down correctly by calculating a checksum over
@@ -456,13 +452,12 @@ pub mod query {
                 );
                 let prebuilt_checksum = record.checksum();
                 let calculated_checksum_from_content = Builder::new()
-                        .buf(record.payload())
-                        .build()
-                        .unwrap()
-                        .checksum();
+                    .buf(record.payload())
+                    .build()
+                    .unwrap()
+                    .checksum();
                 assert_eq!(
-                    prebuilt_checksum,
-                    calculated_checksum_from_content,
+                    prebuilt_checksum, calculated_checksum_from_content,
                     "Unexpected checksum for query {}",
                     query
                 )
@@ -480,19 +475,19 @@ pub mod query {
 }
 
 mod builder {
+    use super::{checksum, Error, Record, Result};
     use std::mem::take;
-    use super::{Record, checksum, Result, Error};
 
     pub struct Builder {
-        data: Vec<u8>
+        data: Vec<u8>,
     }
 
     impl Builder {
         pub fn new() -> Self {
             Builder {
                 data: vec![
-                    0x00 // reserve this byte for the length, but set it to zero for now
-                ]
+                    0x00, // reserve this byte for the length, but set it to zero for now
+                ],
             }
         }
 
@@ -526,7 +521,10 @@ mod builder {
             data[0] = payload_len; // first byte is length, excluding both length byte itself and checksum
             data.push(checksum(&data));
 
-            debug_assert!(data.len() >= 2, "When constructed through new, assumed that the length is always 2 or more");
+            debug_assert!(
+                data.len() >= 2,
+                "When constructed through new, assumed that the length is always 2 or more"
+            );
             let record = Record { data };
             Ok(record)
         }
@@ -539,22 +537,16 @@ mod builder {
         #[test]
         fn buf() {
             const BUF_EXPECTED_RESULT: &[u8] = &[
-                0x24, 0x05, 0x00, 0x00, 0x00, 0x57, 0x00, 0x12, 0x00, 0x1b, 0x00, 0x12, 0x1c, 0x8b, 0x45, 0x06,
-                0xf9, 0x00, 0xe0, 0x01, 0x00, 0x0a, 0xe0, 0x01, 0x05, 0x0a, 0x00, 0x80, 0x01, 0x60, 0x01, 0xa0,
-                0x00, 0x4f, 0x00, 0x00, 0x30, 0x7a
+                0x24, 0x05, 0x00, 0x00, 0x00, 0x57, 0x00, 0x12, 0x00, 0x1b, 0x00, 0x12, 0x1c, 0x8b,
+                0x45, 0x06, 0xf9, 0x00, 0xe0, 0x01, 0x00, 0x0a, 0xe0, 0x01, 0x05, 0x0a, 0x00, 0x80,
+                0x01, 0x60, 0x01, 0xa0, 0x00, 0x4f, 0x00, 0x00, 0x30, 0x7a,
             ];
             let buf_contents = &BUF_EXPECTED_RESULT[1..(BUF_EXPECTED_RESULT.len() - 1)];
 
             let record = Builder::new().buf(buf_contents).build().unwrap();
 
-            assert_eq!(
-                record.as_bytes(),
-                BUF_EXPECTED_RESULT
-            );
-            assert_eq!(
-                record.payload(),
-                buf_contents
-            );
+            assert_eq!(record.as_bytes(), BUF_EXPECTED_RESULT);
+            assert_eq!(record.payload(), buf_contents);
             assert_eq!(
                 record.checksum(),
                 BUF_EXPECTED_RESULT[BUF_EXPECTED_RESULT.len() - 1]

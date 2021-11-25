@@ -1,15 +1,13 @@
+use crate::{args::Scan as Opts, scan::Scan, serial::open};
 use thiserror::Error;
-use crate::{
-    args::Scan as Opts,
-    scan::Scan,
-    serial::open
-};
 
 type Result<T> = std::result::Result<T, ScanError>;
 
 pub fn scan(scan: Opts) -> Result<()> {
-    let mut serial = open(&scan.serial)
-        .map_err(|e| ScanError::Serial { source: e, port: scan.serial })?;
+    let mut serial = open(&scan.serial).map_err(|e| ScanError::Serial {
+        source: e,
+        port: scan.serial,
+    })?;
 
     let mut none = false;
     for find in Scan::new(&mut serial).filter_map(crate::scan::Result::ok) {

@@ -5,22 +5,25 @@ pub type Result<T> = std::result::Result<T, crate::status::Error>;
 
 pub struct Scan<'a> {
     serial: &'a mut Serial,
-    next_address: u8
+    next_address: u8,
 }
 
-const ADDRESS_MIN : u8 = 0;
-const ADDRESS_MAX : u8 = 15;
+const ADDRESS_MIN: u8 = 0;
+const ADDRESS_MAX: u8 = 15;
 
 impl<'a> Scan<'a> {
     pub fn new(serial: &'a mut Serial) -> Self {
-        Self { serial, next_address: ADDRESS_MIN }
+        Self {
+            serial,
+            next_address: ADDRESS_MIN,
+        }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Find {
     address: u8,
-    status: Status
+    status: Status,
 }
 
 impl Find {
@@ -42,8 +45,10 @@ impl<'a> Iterator for Scan<'a> {
         }
 
         let address = self.next_address;
-        let item = status(self.serial, address)
-            .map(|s| Find { address: address, status: s });
+        let item = status(self.serial, address).map(|s| Find {
+            address: address,
+            status: s,
+        });
         self.next_address += 1;
         Some(item)
     }
