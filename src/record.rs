@@ -41,11 +41,11 @@ pub mod res {
     /// Verifies that the given buffer holds an acknowledgement response without an attached
     /// record, that is 0x4F.
     pub fn verify_ack_response(buf: &[u8]) -> Result<()> {
-        if buf.len() == 0 || buf[0] != 0x4f {
+        if buf.is_empty() || buf[0] != 0x4f {
             return Err(Error::ResponseMagicNumberMissing);
         }
 
-        if buf != &[0x4f] {
+        if buf != [0x4f] {
             return Err(Error::ResponseNotAcknowledgement);
         }
 
@@ -57,7 +57,7 @@ pub mod res {
     /// the payload part of the response if successfull, that is, 0x4f, len and checksum are left
     /// out.
     pub fn response_payload(buf: &[u8]) -> Result<&[u8]> {
-        if buf.len() == 0 || buf[0] != 0x4f {
+        if buf.is_empty() || buf[0] != 0x4f {
             return Err(Error::ResponseMagicNumberMissing);
         }
         let buf = &buf[1..];

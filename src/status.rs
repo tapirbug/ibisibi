@@ -9,7 +9,7 @@ pub fn status(serial: &mut Serial, address: u8) -> Result<Status> {
     assert!(address < 16, "Expected address in range 0..=15");
 
     let telegram = Telegram::display_status(address);
-    serial.write(telegram.as_bytes())?;
+    serial.write_all(telegram.as_bytes())?;
 
     let mut response = [0_u8; 4];
     serial.read_exact(&mut response)?;

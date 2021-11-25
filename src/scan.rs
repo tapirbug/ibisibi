@@ -45,10 +45,7 @@ impl<'a> Iterator for Scan<'a> {
         }
 
         let address = self.next_address;
-        let item = status(self.serial, address).map(|s| Find {
-            address: address,
-            status: s,
-        });
+        let item = status(self.serial, address).map(|s| Find { address, status: s });
         self.next_address += 1;
         Some(item)
     }
