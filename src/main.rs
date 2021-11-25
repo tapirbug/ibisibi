@@ -5,6 +5,7 @@ mod args;
 mod cycle;
 mod destination;
 mod devices;
+mod flash;
 mod list;
 mod parity;
 mod plan;

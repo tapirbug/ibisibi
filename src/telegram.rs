@@ -108,7 +108,10 @@ impl Telegram {
     /// address but we have seen software in the wild that uses address 0 so we support
     /// it here.
     ///
-    /// Example response from a BS210 flipdot display: `aVV2.3RigaB/H7/99`.
+    /// Example response from a BS210 flipdot display: `aVV2.3RigaB/H7/99`. This exact
+    /// value is set in gBUSE0 for many data bases in Configuration | Sign | Database version,
+    /// where firmware is also set to 2.11. It is not known if this value is required for
+    /// the databases to work.
     ///
     /// # Panics
     /// This function panics if the address is higher than 15.

@@ -17,8 +17,8 @@ pub struct TopLevel {
 pub enum Invocation {
     #[serde(skip)]
     Run(Run),
-    #[serde(skip)]
     List(List),
+    Flash(Flash),
     #[serde(skip)]
     Scan(Scan),
     Destination(Destination),
@@ -58,6 +58,21 @@ pub struct Destination {
     /// optional line number, in range 1-999.
     #[argh(option, short = 'l')]
     pub line: Option<u16>,
+    /// serial port to use, e.g. /dev/ttyUSB0 on Linux, or COM5 on Windows.
+    #[argh(option, short = 's')]
+    pub serial: String,
+}
+
+/// Flash a new sign database in .hex format to a BS210 sign.
+#[derive(FromArgs, Deserialize, Debug)]
+#[argh(subcommand, name = "flash")]
+pub struct Flash {
+    /// path to a BS210-compatible sign database in `.hex` format.
+    #[argh(positional)]
+    pub sign_db_hex: PathBuf,
+    /// IBIS address to flash to in range 0..15.
+    #[argh(option, short = 'a')]
+    pub address: u8,
     /// serial port to use, e.g. /dev/ttyUSB0 on Linux, or COM5 on Windows.
     #[argh(option, short = 's')]
     pub serial: String,

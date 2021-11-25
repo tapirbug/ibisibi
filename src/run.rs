@@ -12,6 +12,7 @@ pub fn run(invocation: Invocation) -> Result<(), String> {
             crate::destination::destination(&destination).map_err(|e| format!("{}", e))
         }
         Invocation::Cycle(cycle) => crate::cycle::cycle(&cycle).map_err(|e| format!("{}", e)),
+        Invocation::Flash(flash) => crate::flash::flash(flash).map_err(|e| format!("{}", e))
     }
 }
 

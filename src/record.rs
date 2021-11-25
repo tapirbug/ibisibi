@@ -16,11 +16,6 @@ pub struct Record {
 }
 
 impl Record {
-    /// Record data excluding the first (length) and last (checksum) bytes.
-    pub fn payload(&self) -> &[u8] {
-        &self.data[1..self.data.len()-1]
-    }
-
     /// The bytes of the full record, including the length and the checksum.
     ///
     /// Guaranteed to have a size of two bytes or more.
@@ -28,6 +23,13 @@ impl Record {
         &self.data[..]
     }
 
+    /// Record data excluding the first (length) and last (checksum) bytes.
+    #[cfg(test)]
+    pub fn payload(&self) -> &[u8] {
+        &self.data[1..self.data.len()-1]
+    }
+
+    #[cfg(test)]
     pub fn checksum(&self) -> u8 {
         self.data[self.data.len() - 1]
     }
@@ -35,16 +37,6 @@ impl Record {
 
 pub mod res {
     use super::{Result, Error, checksum};
-
-    /// Verifies that a reponse from a BS210 conforms to the normal structure of a response
-    /// received from BS210, that is, it starts with 0x4f, followed by a record.
-    ///
-    /// This method is to be used where the contents are not well-understood and only the
-    /// length and checksum should be verified.
-    pub fn verify_response_record(buf: &[u8]) -> Result<()> {
-        response_payload(buf)?;
-        Ok(())
-    }
 
     /// Verifies that the given buffer holds an acknowledgement response without an attached
     /// record, that is 0x4F.
@@ -60,8 +52,10 @@ pub mod res {
         Ok(())
     }
 
-    /// Verifies response integrity and returns the payload part (without len and checksum),
-    /// if successful
+    /// Verifies that a reponse from a BS210 conforms to the normal structure of a response
+    /// received from BS210, that is, it starts with 0x4f, followed by a record. Returns only
+    /// the payload part of the response if successfull, that is, 0x4f, len and checksum are left
+    /// out.
     pub fn response_payload(buf: &[u8]) -> Result<&[u8]> {
         if buf.len() == 0 || buf[0] != 0x4f {
             return Err(Error::ResponseMagicNumberMissing);
@@ -106,13 +100,13 @@ pub mod res {
         #[test]
         fn ok_unknown_query_0_response() {
             const RESPONSE: &[u8] = &[ 0x4f, 0x01, 0x57, 0xa8 ];
-            verify_response_record(RESPONSE).unwrap();
+            response_payload(RESPONSE).unwrap();
         }
 
         #[test]
         fn ok_other_response_of_unknown_purpose() {
             const RESPONSE: &[u8] = & [ 0x4f, 0x10, 0x00, 0x00, 0x02, 0x00, 0xdf, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xf7, 0xf7, 0x26 ];
-            verify_response_record(RESPONSE).unwrap();
+            response_payload(RESPONSE).unwrap();
         }
 
         #[test]
@@ -120,14 +114,14 @@ pub mod res {
             const RESPONSE: &[u8] = &[
                 0x4f, 0x10, 0x50, 0x41, 0x4e, 0x45, 0x4c, 0x20, 0x56, 0x33, 0x2e, 0x31, 0x31, 0x20, 0x20, 0x20, 0x20, 0x20, 0xa7
             ];
-            verify_response_record(RESPONSE).unwrap();
+            response_payload(RESPONSE).unwrap();
         }
 
         #[test]
         fn checksum_missing_unknown_query_0_response() {
             const RESPONSE: &[u8] = &[ 0x4f, 0x01, 0x57 ];
             assert_eq!(
-                verify_response_record(RESPONSE).unwrap_err(),
+                response_payload(RESPONSE).unwrap_err(),
                 Error::ResponseChecksumMismatch { expected: 0xFF, received: 0x57 }
             )
         }
@@ -136,7 +130,7 @@ pub mod res {
         fn checksum_failure_unknown_query_0_response() {
             const RESPONSE: &[u8] = &[ 0x4f, 0x01, 0x57, 0xb9 ];
             assert_eq!(
-                verify_response_record(RESPONSE).unwrap_err(),
+                response_payload(RESPONSE).unwrap_err(),
                 Error::ResponseChecksumMismatch { expected: 0xa8, received: 0xb9 }
             )
         }
@@ -176,7 +170,7 @@ pub mod res {
         #[test]
         fn empty_response() {
             assert_eq!(
-                verify_response_record(&[]).unwrap_err(),
+                response_payload(&[]).unwrap_err(),
                 Error::ResponseMagicNumberMissing
             )
         }
@@ -244,21 +238,23 @@ pub mod db {
                 .map(DatabaseChunk)
         }
 
+        /// The bytes of the full record, including the length and the checksum.
+        ///
+        /// Guaranteed to have a size of four bytes or more.
+        pub fn as_bytes(&self) -> &[u8] {
+            self.0.as_bytes()
+        }
+
+        #[cfg(test)]
         pub fn address(&self) -> u16 {
             let payload = self.0.payload();
             u16::from_le_bytes([payload[1], payload[2]])
         }
 
         /// The data part of the record.
+        #[cfg(test)]
         pub fn data(&self) -> &[u8] {
             &self.0.payload()[4..]
-        }
-
-        /// The bytes of the full record, including the length and the checksum.
-        ///
-        /// Guaranteed to have a size of four bytes or more.
-        pub fn as_bytes(&self) -> &[u8] {
-            self.0.as_bytes()
         }
     }
 
@@ -336,12 +332,36 @@ pub mod query {
     use lazy_static::lazy_static;
 
     lazy_static! {
-        static ref UNKNOWN_QUERY_0 : Record = Record {
+        static ref PREPARE_CLEAR_0 : Record = Record {
             data: vec![ 0x06, 0x01, 0x21, 0x00, 0x00, 0x00, 0x00, 0xd8 ]
         };
 
-        static ref UNKNOWN_QUERY_1 : Record = Record {
+        static ref PREPARE_CLEAR_1 : Record = Record {
             data: vec![ 0x04, 0x08, 0x00, 0x20, 0x01, 0xd3 ]
+        };
+
+        static ref CLEAR : Record = Record {
+            data: vec![
+                0x23, 0x03, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+                0x01, 0x01, 0x01, 0x01, 0xba,
+            ]
+        };
+
+        static ref FINISH_CLEAR_0 : Record = Record {
+            data: vec![ 0x05, 0x05, 0x00, 0x00, 0x00, 0x00, 0xf6 ]
+        };
+
+        static ref FINISH_CLEAR_1 : Record = Record {
+            data: vec![ 0x02, 0x07, 0x00, 0xf7 ]
+        };
+
+        static ref FINISH_FLASH_0 : Record = Record {
+            data: vec![ 0x02, 0x15, 0x55, 0x94 ]
+        };
+
+        static ref FINISH_FLASH_1 : Record = Record {
+            data: vec![ 0x01, 0x0f, 0xf0 ]
         };
     }
 
@@ -349,18 +369,73 @@ pub mod query {
     ///
     /// Device should send back `4f` when sending this query.
     ///
-    /// It is not known what the query or the response actually mean.
-    pub fn unknown_query_0() -> &'static Record {
-        &UNKNOWN_QUERY_0
+    /// It is not known what the query or the response actually mean, but it was sent in all
+    /// observed runs of the flashing.
+    pub fn prepare_clear_0() -> &'static Record {
+        &PREPARE_CLEAR_0
     }
 
-    /// Second record to be sent after `prepare_flashing_0`.
+    /// Second record to be sent after selecting the address.
     ///
     /// Device should send back `4f 01 57 a8` when sending this query.
     ///
-    /// It is not known what the query or the response actually mean.
-    pub fn unknown_query_1() -> &'static Record {
-        &UNKNOWN_QUERY_1
+    /// It is not known what the query or the response actually mean, but it was sent in all
+    /// observed runs of the flashing.
+    /// 
+    /// After this we see in the logs that we disconnect and connect again, maybe to change
+    /// baudrate. Not known if this reconnecting is necessary.
+    pub fn prepare_clear_1() -> &'static Record {
+        &PREPARE_CLEAR_1
+    }
+
+    /// Sent four times after `prepare_clear_1`.
+    /// 
+    /// Each time we expect a repsonse of 0x45 (E).
+    /// 
+    /// Why the exact same message is sent four times is not known. Maybe this is supposed
+    /// to overwrite four consecutive blocks but an implementation error causes it to clear
+    /// the same block over and over?
+    pub fn clear() -> &'static Record {
+        &CLEAR
+    }
+
+    /// First record to be sent after sending the four clear messages.
+    ///
+    /// Device should send back `0x4f` (O) when sending this query.
+    ///
+    /// It is not known what the query or the response actually mean, but it was sent in all
+    /// observed runs of the flashing.
+    pub fn finish_clear_0() -> &'static Record {
+        &FINISH_CLEAR_0
+    }
+
+    /// Second record to be sent after sending the four clear messages.
+    ///
+    /// Device should send back `0x4f` (O) when sending this query.
+    ///
+    /// It is not known what the query or the response actually mean, but it was sent in all
+    /// observed runs of the flashing.
+    pub fn finish_clear_1() -> &'static Record {
+        &FINISH_CLEAR_1
+    }
+
+    /// First record to be sent after sending the sign database.
+    ///
+    /// Device should send back `0x4f` (O) when sending this query.
+    ///
+    /// It is not known what the query or the response actually mean, but it was sent in all
+    /// observed runs of the flashing.
+    pub fn finish_flash_0() -> &'static Record {
+        &FINISH_FLASH_0
+    }
+
+    /// Second (and last) record to be sent after sending the sign database. Looks like the
+    /// record is sent four times in sequence, unsuccessfully trying to read a repsponse from
+    /// the device (timoeout).
+    ///
+    /// Not clear if this is in any way required for flashing.
+    pub fn finish_flash_1() -> &'static Record {
+        &FINISH_FLASH_1
     }
 
     #[cfg(test)]
@@ -370,41 +445,36 @@ pub mod query {
 
         /// Since length and checksum are handcoded, we need to make sure that
         /// we wrote everything down correctly by calculating a checksum over
-        /// the buffer.
+        /// the buffers.
         #[test]
-        fn unknown_query_0_integrity() {
-            let static_unkown_query = unknown_query_0();
-            let calculated_unknown_query = Builder::new()
-                .buf(static_unkown_query.payload())
-                .build()
-                .unwrap();
+        fn prebuilt_queries_integrity() {
+            fn check_integrity(query: &'static str, record: &Record) {
+                assert!(
+                    record.data.len() >= 2,
+                    "Static guarantee for at least two bytes violated in prebuilt query {}",
+                    query
+                );
+                let prebuilt_checksum = record.checksum();
+                let calculated_checksum_from_content = Builder::new()
+                        .buf(record.payload())
+                        .build()
+                        .unwrap()
+                        .checksum();
+                assert_eq!(
+                    prebuilt_checksum,
+                    calculated_checksum_from_content,
+                    "Unexpected checksum for query {}",
+                    query
+                )
+            }
 
-            assert_eq!(
-                static_unkown_query.checksum(),
-                calculated_unknown_query.checksum()
-            );
-            assert_eq!(
-                static_unkown_query.as_bytes(),
-                calculated_unknown_query.as_bytes()
-            );
-        }
-
-        #[test]
-        fn unknown_query_1_integrity() {
-            let static_unkown_query = unknown_query_1();
-            let calculated_unknown_query = Builder::new()
-                .buf(static_unkown_query.payload())
-                .build()
-                .unwrap();
-
-            assert_eq!(
-                static_unkown_query.checksum(),
-                calculated_unknown_query.checksum()
-            );
-            assert_eq!(
-                static_unkown_query.as_bytes(),
-                calculated_unknown_query.as_bytes()
-            );
+            check_integrity("prepare_clear_0", prepare_clear_0());
+            check_integrity("prepare_clear_1", prepare_clear_1());
+            check_integrity("clear", clear());
+            check_integrity("finish_clear_0", finish_clear_0());
+            check_integrity("finish_clear_1", finish_clear_1());
+            check_integrity("finish_flash_0", finish_flash_0());
+            check_integrity("finish_flash_1", finish_flash_1());
         }
     }
 }
