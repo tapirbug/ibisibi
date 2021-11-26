@@ -27,27 +27,40 @@ pub fn flash(opts: Flash) -> Result<()> {
         source: e,
         port: serial.clone(),
     })?;
+    let db = read_to_string(sign_db_hex).map_err(FlashError::DbRead)?;
+    let db = Reader::new(&db);
 
+    check_compatibility(&mut serial, address)?;
+    perform_flashing(&mut serial, address, db)
+}
+
+/// Ensure that a device is listening at the specified address for flashing, so
+/// that we can abort early on obvious operator or connection errors.
+///
+/// More sanity checks may be added to this function in the future.
+#[tracing::instrument(skip(serial))]
+fn check_compatibility(serial: &mut Serial, address: u8) -> Result<()> {
     // Check device status first and print it as debug output,
-    // if there are any hickups with that we abort early
-    dump_status(&mut serial, address)?;
+    dump_status(serial, address)
 
-    // Could check status, start flashing
-    select_address(&mut serial, address)?;
-    clear_database(&mut serial)?;
-    flash_database(
-        &mut serial,
-        Reader::new(&read_to_string(sign_db_hex).map_err(FlashError::DbRead)?),
-    )?;
-
-    Ok(())
+    // Other commands are sent in observed flashings that might
+    // also serve as sanity checks, but we do not understand them well
+    // enoug to add them here yet.
 }
 
 #[tracing::instrument(skip(serial))]
-pub fn dump_status(serial: &mut Serial, address: u8) -> Result<()> {
+fn dump_status(serial: &mut Serial, address: u8) -> Result<()> {
     let status = status(serial, address)?;
     debug!("Device status before starting flashing: {}", status);
     Ok(())
+}
+
+/// Sends the actual flashing commands over the wire.
+#[tracing::instrument(skip(serial, db))]
+fn perform_flashing(serial: &mut Serial, address: u8, db: Reader) -> Result<()> {
+    select_address(serial, address)?;
+    clear_database(serial)?;
+    flash_database(serial, db)
 }
 
 #[tracing::instrument(skip(serial))]
@@ -59,15 +72,15 @@ fn select_address(serial: &mut Serial, address: u8) -> Result<()> {
 }
 
 #[tracing::instrument(skip(serial))]
-pub fn clear_database(serial: &mut Serial) -> Result<()> {
+fn clear_database(serial: &mut Serial) -> Result<()> {
     let mut buf = [0_u8; 4];
 
-    debug!("Preparing clearing (0)");
+    debug!("Preparing clearing (1/2)");
     serial.write_all(query::prepare_clear_0().as_bytes())?;
     serial.read_exact(&mut buf[0..1])?;
     res::verify_ack_response(&buf[0..1]).map_err(FlashError::PrepareClear0)?;
 
-    debug!("Preparing clearing (1)");
+    debug!("Preparing clearing (2/2)");
     const EXPECTED_QUERY_1_RESPONSE: &[u8] = &[0x57];
     serial.write_all(query::prepare_clear_1().as_bytes())?;
     serial.read_exact(&mut buf[..])?;
@@ -78,7 +91,7 @@ pub fn clear_database(serial: &mut Serial) -> Result<()> {
     }
 
     for i in 0..4 {
-        debug!("Clearing ({})", i);
+        debug!("Clearing ({}/4)", i);
         serial.write_all(query::clear().as_bytes())?;
         serial.read_exact(&mut buf[0..1])?;
         let response = buf[0];
@@ -87,12 +100,12 @@ pub fn clear_database(serial: &mut Serial) -> Result<()> {
         }
     }
 
-    debug!("Finishing clearing (1)");
+    debug!("Finishing clearing (1/2)");
     serial.write_all(query::finish_clear_0().as_bytes())?;
     serial.read_exact(&mut buf[0..1])?;
     res::verify_ack_response(&buf[0..1]).map_err(FlashError::FinishClear0)?;
 
-    debug!("Finishing clearing (2)");
+    debug!("Finishing clearing (2/2)");
     serial.write_all(query::finish_clear_1().as_bytes())?;
     serial.read_exact(&mut buf[0..1])?;
     res::verify_ack_response(&buf[0..1]).map_err(FlashError::FinishClear1)?;
@@ -101,7 +114,7 @@ pub fn clear_database(serial: &mut Serial) -> Result<()> {
 }
 
 #[tracing::instrument(skip(serial, reader))]
-pub fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
+fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
     let mut buf = [0_u8; 1];
     let mut eof_found = false;
     let mut write_offset = 0;
@@ -140,13 +153,13 @@ pub fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
         warn!("No EOF record found in database, ignoring");
     }
 
-    debug!("Finishing flashing (1)");
+    debug!("Finishing flashing (1/2)");
     serial.write_all(query::finish_flash_0().as_bytes())?;
     serial.read_exact(&mut buf)?;
     res::verify_ack_response(&buf).map_err(FlashError::FinishFlash0)?;
 
     for _ in 0..4 {
-        debug!("Finishing flashing (2)");
+        debug!("Finishing flashing (2/2)");
         serial.write_all(query::finish_flash_1().as_bytes())?;
     }
     // do not expect any reponse for the second finishing step
