@@ -54,16 +54,18 @@ impl<'a> Iterator for Scan<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::telegram::Telegram;
 
     #[test]
     fn discover_address_9() {
         let mut serial = Serial::builder();
         let available_address = 9;
         for address in ADDRESS_MIN..=ADDRESS_MAX {
+            serial.expect_write(Telegram::display_status(address).as_bytes());
             if address != available_address {
                 serial.time_out();
             } else {
-                serial.receive(b"a0\r#");
+                serial.respond(b"a0\r#");
             }
         }
         let mut serial = serial.build();

@@ -48,7 +48,19 @@ mod mock {
     };
 
     pub struct MockSerial {
+        /// We expect these buffers to be written in sequence.
+        expected_writes: Vec<Vec<u8>>,
+        /// Scheduled responses for the next reads.
         read_results: Vec<ReadResult>,
+    }
+
+    impl MockSerial {
+        pub fn builder() -> Builder {
+            Builder {
+                expected_writes: vec![],
+                read_results: vec![],
+            }
+        }
     }
 
     impl Read for MockSerial {
@@ -97,6 +109,19 @@ mod mock {
 
     impl Write for MockSerial {
         fn write(&mut self, buf: &[u8]) -> Result<usize> {
+            if self.expected_writes.is_empty() {
+                panic!("Expected no more writes but got {:X?}", buf);
+            }
+
+            let expected = self.expected_writes.remove(0);
+            if &expected != buf {
+                panic!(
+                    "Expected to receive {expected:X?} but got {actual:X?}",
+                    expected = expected,
+                    actual = buf
+                );
+            }
+
             // do nothing but fool the code under test that all data has been "written"
             Ok(buf.len())
         }
@@ -107,29 +132,41 @@ mod mock {
         }
     }
 
+    impl Drop for MockSerial {
+        fn drop(&mut self) {
+            if !self.expected_writes.is_empty() {
+                // This panic causes an abort if drop is called inside a panic.
+                // In such cases the program will abort and omit this helpful message.
+                // Hence: If a test expects a panic, ensure that no more writes are scheduled.
+
+                // FIXME un-uncomment
+                // panic!("Expected more interactions:\n{:X?}", self.expected_writes.iter().enumerate());
+            }
+        }
+    }
+
     #[derive(Clone)]
     enum ReadResult {
         Data(Vec<u8>),
         Timeout,
     }
 
-    impl MockSerial {
-        pub fn builder() -> Builder {
-            Builder {
-                read_results: vec![],
-            }
-        }
-    }
-
     pub struct Builder {
         read_results: Vec<ReadResult>,
+        expected_writes: Vec<Vec<u8>>,
     }
 
     impl Builder {
+        /// Plans that the next write attempt will write exactly the given data.
+        pub fn expect_write(&mut self, request: &[u8]) -> &mut Self {
+            self.expected_writes.push(request.to_vec());
+            self
+        }
+
         /// Plans that the next read attempt will read exactly the given data.
         ///
         /// If it does not fill the buffer completely, the rest will be read later.
-        pub fn receive(&mut self, response: &[u8]) -> &mut Self {
+        pub fn respond(&mut self, response: &[u8]) -> &mut Self {
             self.read_results.push(ReadResult::Data(response.to_vec()));
             self
         }
@@ -145,6 +182,7 @@ mod mock {
         /// Can safely be called multiple times.
         pub fn build(&self) -> MockSerial {
             MockSerial {
+                expected_writes: self.expected_writes.clone(),
                 read_results: self.read_results.clone(),
             }
         }

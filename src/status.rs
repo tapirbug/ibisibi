@@ -91,7 +91,7 @@ mod test {
 
     #[test]
     fn timeout() {
-        let mut serial = Serial::builder().time_out().build();
+        let mut serial = Serial::builder().expect_write(b"a0\r#").time_out().build();
 
         let err = status(&mut serial, 0).unwrap_err();
 
@@ -101,7 +101,8 @@ mod test {
     #[test]
     fn checksum_err() {
         let mut serial = Serial::builder()
-            .receive(b"a0\r0") // correct checksum would be #, not 0
+            .expect_write(b"a0\r#")
+            .respond(b"a0\r0") // correct checksum would be #, not 0
             .build();
 
         let err = status(&mut serial, 0).unwrap_err();
@@ -114,7 +115,10 @@ mod test {
 
     #[test]
     fn ok() {
-        let mut serial = Serial::builder().receive(b"a3\r ").build();
+        let mut serial = Serial::builder()
+            .expect_write(b"a0\r#")
+            .respond(b"a3\r ")
+            .build();
 
         let status = status(&mut serial, 0).unwrap();
 
@@ -127,7 +131,10 @@ mod test {
 
     #[test]
     fn ready_for_data() {
-        let mut serial = Serial::builder().receive(b"a0\r#").build();
+        let mut serial = Serial::builder()
+            .expect_write(b"a9\r*")
+            .respond(b"a0\r#")
+            .build();
 
         let status = status(&mut serial, 9).unwrap();
 
@@ -140,7 +147,10 @@ mod test {
 
     #[test]
     fn uncategorized_status() {
-        let mut serial = Serial::builder().receive(b"a7\r$").build();
+        let mut serial = Serial::builder()
+            .expect_write(b"a8\r+")
+            .respond(b"a7\r$")
+            .build();
 
         let status = status(&mut serial, 8).unwrap();
 
