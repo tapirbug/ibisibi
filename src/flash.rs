@@ -65,6 +65,7 @@ fn perform_flashing(serial: &mut Serial, address: u8, db: Reader) -> Result<()> 
 
 #[tracing::instrument(skip(serial))]
 fn select_address(serial: &mut Serial, address: u8) -> Result<()> {
+    serial.write_all(Telegram::empty().as_bytes())?;
     // r.S1 (select address?)
     serial.write_all(Telegram::bs_select_address(address).as_bytes())?;
     // no response expected
@@ -281,7 +282,8 @@ mod test {
         let reader = Reader::new(MINI0);
         let mut serial = Serial::builder()
             // The initial address selection, no response expected
-            .expect_write(&[0x0d, 0x72, 0x1b, 0x53, 0x31, 0x0d, 0x0b])
+            .expect_write(&[0x0d, 0x72])
+            .expect_write(&[0x1b, 0x53, 0x31, 0x0d, 0x0b])
             // Clearing setup 1
             .expect_write(&[0x06, 0x01, 0x21, 0x00, 0x00, 0x00, 0x00, 0xd8])
             .respond(b"O")

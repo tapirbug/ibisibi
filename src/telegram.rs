@@ -5,7 +5,7 @@
 //! called "Datensatz" in german, e.g. DS003.
 
 use builder::Builder;
-use std::{fmt, str::from_utf8};
+use std::fmt;
 
 pub use parse::TelegramParseError;
 
@@ -18,19 +18,32 @@ pub use parse::TelegramParseError;
 /// produces the DS003 telegram.
 pub struct Telegram(Vec<u8>);
 
-impl fmt::Debug for Telegram {
+impl fmt::Display for Telegram {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let len_excl_cr_and_partiy = self.0.len() - 2;
-        let human_readable_part = from_utf8(&self.0[0..len_excl_cr_and_partiy])
-            // excluding trailer, telegrams produced through normal means are always valid strings
-            .unwrap();
+        let len_excl_cr_and_parity = self.0.len() - 2;
+        let payload = &self.0[0..len_excl_cr_and_parity];
+        for &byte in payload {
+            if byte.is_ascii_graphic() {
+                write!(f, "{}", byte as char)?;
+            } else {
+                write!(f, ".")?;
+            }
+        }
+
         let parity_byte = self.0[self.0.len() - 1];
         write!(
             f,
-            "{str}<CR><P:{parity:X?}>",
-            str = human_readable_part,
+            "<CR><P:{parity:X?}>",
             parity = parity_byte
         )
+    }
+}
+
+impl fmt::Debug for Telegram {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("Telegram")
+            .field(&String::from_utf8_lossy(&self.0[..]))
+            .finish()
     }
 }
 
@@ -125,9 +138,17 @@ impl Telegram {
             .finish()
     }
 
+    /// An empty IBIS telegram, consisting only of the terminating carriage return
+    /// and a checksum of 0x72.
+    /// 
+    /// The effect of an empty message is not known, but it has been observed that
+    /// this message is sent right before `bs_select_address` (in the same physical write).
+    pub fn empty() -> Telegram {
+        Builder::with_msg_len(0).finish()   
+    }
+
     /// Command of unknown purpose that is sent before flashing a sign database to a
-    /// BS210 sign on specific address. It has a prefix of 0D 72 before the actual message
-    /// that is not included in the checksum.
+    /// BS210 sign on specific address right after an empty telegram.
     ///
     /// In our tests we never saw any response to this message, so it might also not be
     /// relevant at all.
@@ -136,8 +157,7 @@ impl Telegram {
             address <= 15,
             "Address for select address must be in range 0-15"
         );
-        Builder::with_msg_len(5)
-            .prefix(&[0x0D, 0x72])
+        Builder::with_msg_len(3)
             .byte(0x1B)
             .byte(b'S')
             .address(address)
@@ -145,7 +165,6 @@ impl Telegram {
     }
 
     /// Gets the telegram payload, that is, the part before CR and the checksum.
-    /// If the message has a prefix, that will be included in the returned payload.
     #[cfg(test)]
     pub fn payload(&self) -> &[u8] {
         &self.0[..self.0.len() - 2]
@@ -163,28 +182,15 @@ mod builder {
     use crate::parity::parity_byte;
 
     pub struct Builder {
-        prefix_len: usize,
         message: Vec<u8>,
     }
 
     impl Builder {
         pub fn with_msg_len(expected_len: usize) -> Self {
             Builder {
-                prefix_len: 0,
                 // 2 extra bytes for CR and parity byte
                 message: Vec::with_capacity(expected_len + 2),
             }
-        }
-
-        /// Adds a prefix at the start of the message that is not included in the checksum.
-        pub fn prefix(mut self, prefix: &[u8]) -> Self {
-            assert!(
-                self.message.is_empty(),
-                "expected empty message when specifying prefix"
-            );
-            self.prefix_len = prefix.len();
-            self.message.extend(prefix);
-            self
         }
 
         pub fn byte(mut self, byte: u8) -> Self {
@@ -218,8 +224,7 @@ mod builder {
         pub fn finish(mut self) -> Telegram {
             // parity includes carriage return
             self.message.push(b'\r');
-            // prefix_len is always <= message len when constructed through Builder methods
-            let parity = parity_byte(&self.message[self.prefix_len..]);
+            let parity = parity_byte(&self.message[..]);
             self.message.push(parity);
             // take message and leave empty message in the builder
             Telegram(self.message)
@@ -449,7 +454,7 @@ mod test {
     #[test]
     fn destination_523_debug_repr() {
         let telegram = Telegram::destination(523);
-        let telegram = &format!("{:?}", telegram);
+        let telegram = &format!("{}", telegram);
         assert_eq!(telegram, "z523<CR><P:3C>");
     }
 
@@ -469,14 +474,14 @@ mod test {
     fn display_version_of_address_one() {
         let telegram = Telegram::display_version(1);
         assert_eq!(telegram.payload(), b"aV1");
-        let telegram = &format!("{:?}", telegram);
+        let telegram = &format!("{}", telegram);
         assert_eq!(telegram, "aV1<CR><P:74>");
     }
 
     #[test]
     fn display_status_questionmark() {
         let telegram = Telegram::display_status(15);
-        let telegram = &format!("{:?}", telegram);
+        let telegram = &format!("{}", telegram);
         assert_eq!(telegram, "a?<CR><P:2C>");
     }
 
@@ -484,8 +489,19 @@ mod test {
     fn display_status_zero() {
         let telegram = Telegram::display_status(0);
         assert_eq!(telegram.payload(), b"a0");
-        let telegram = &format!("{:?}", telegram);
+        let telegram = &format!("{}", telegram);
         assert_eq!(telegram, "a0<CR><P:23>");
+    }
+
+    #[test]
+    fn empty() {
+        let telegram = Telegram::empty();
+        assert_eq!(
+            telegram.as_bytes(),
+            &[ 0x0d, 0x72 ]
+        );
+        let telegram = &format!("{}", telegram);
+        assert_eq!(telegram, "<CR><P:72>");
     }
 
     #[test]
@@ -493,12 +509,21 @@ mod test {
         let telegram = Telegram::bs_select_address(1);
         assert_eq!(
             telegram.payload(),
-            &[0x0d, 0x72, 0x1b, 0x53, 0x31],
-            "Payload of messages with prefix should include the prefix"
+            &[0x1b, 0x53, 0x31]
         );
         assert_eq!(
             telegram.as_bytes(),
-            &[0x0d, 0x72, 0x1b, 0x53, 0x31, 0x0d, 0x0b]
+            &[0x1b, 0x53, 0x31, 0x0d, 0x0b]
+        );
+        let telegram_dbg = &format!("{:?}", telegram);
+        let telegram_display = &format!("{}", telegram);
+        assert_eq!(
+            telegram_dbg,
+            "Telegram(\"\\u{1b}S1\\r\\u{b}\")"
+        );
+        assert_eq!(
+            telegram_display,
+            ".S1<CR><P:B>"
         );
     }
 }
