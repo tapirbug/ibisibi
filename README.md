@@ -18,10 +18,25 @@ You may be required to enter your password when the install script installs the 
 ## Examples
 To list available serial ports:
 ```
-ibisibi list
+$ ibisibi list
+/dev/ttyUSB0
 ```
 
-To Show destination 1, then destination 0, then loop through destinations 5 to 10, then repeat:
+To scan for devices and print their statuses and addresses on a given serial port:
+```
+$ ibisibi scan <port from ibisibi list>
+1: Ok (3)
+```
+
+To flash a database to a device with a given address:
+```
+# Warning: This not only overwrites the currently flashed data,
+# this is also very very experimental -  Use at your own risk!
+$ ibisibi flash some_db.hex --address <Address from scan, e.g. "1"> --serial <port from ibisibi list>
+[... Debug output will be written ...]
+```
+
+To show destination 1, then destination 0, then loop through destinations 5 to 10, then repeat, on all listening devices:
 ```
 ibisibi cycle 1 0 5-10 --serial <port from ibisibi list>
 ```
