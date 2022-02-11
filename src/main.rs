@@ -1,5 +1,5 @@
 use tracing::Level;
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 mod args;
 mod cycle;
@@ -20,14 +20,10 @@ mod telegram;
 
 fn main() -> Result<(), String> {
     // a builder for `FmtSubscriber`.
-    let subscriber = FmtSubscriber::builder()
-        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
-        // will be written to stdout.
-        .with_max_level(Level::TRACE)
-        // completes the builder.
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    let stderr = std::io::stderr
+        // all spans/events including TRACE will be written to stderr.
+        .with_max_level(Level::TRACE);
+    tracing_subscriber::fmt().with_writer(stderr).init();
 
     let args: args::TopLevel = argh::from_env();
     run::run(args.invocation)
