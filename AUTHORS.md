@@ -17,6 +17,34 @@ License: MIT
 
 Source: crates.io
 
+### ihex
+Use: Reads Intel HEX databases
+
+Statically linked: yes
+
+License: MIT
+
+Source: crates.io
+
+### lazy_static
+Use: Initializes static variables
+
+Statically linked: yes
+
+License: MIT
+
+Source: crates.io
+
+### serde and serde_yaml
+Use: Parse config files
+
+Statically linked: yes
+
+License: MIT
+
+Source: crates.io
+
+
 ### serialport
 Use: Communication over serial port on Linux and Windows.
 
@@ -35,3 +63,20 @@ License: MIT
 
 Source: crates.io
 
+### tracing and tracing-subscriber
+Use: Structured logging / Events
+
+Statically linked: yes
+
+License: MIT
+
+Source: crates.io
+
+### chrono
+Use: Handling of time for display planning
+
+Statically linked: yes
+
+License: MIT
+
+Source: crates.io
