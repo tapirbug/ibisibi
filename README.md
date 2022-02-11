@@ -38,14 +38,14 @@ $ ibisibi flash some_db.hex --address <Address from scan, e.g. "1"> --serial <po
 
 To show destination 1, then destination 0, then loop through destinations 5 to 10, then repeat, on all listening devices:
 ```
-ibisibi cycle 1 0 5-10 --serial <port from ibisibi list>
+$ ibisibi cycle 1 0 5-10 --serial <port from ibisibi list>
 ```
 
 Destinations can be associated with a timestamp. If the timestamp is in the past or more than a
 specified amount of hours into the future, then the associated destination will not yet or no longer
 be shown, e.g.:
 ```
-ibisibi cycle \
+$ ibisibi cycle \
 # Show entries up to 12 hours in advance
 --lookahead 12
 # Show this one regardless of time
@@ -78,5 +78,5 @@ cycle:
 ```
 and run it with the `run` command:
 ```
-ibisibi run /path/to/your/config.yaml
+$ ibisibi run /path/to/your/config.yaml
 ```
