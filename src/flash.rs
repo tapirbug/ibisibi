@@ -158,10 +158,8 @@ fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
     serial.read_exact(&mut buf)?;
     res::verify_ack_response(&buf).map_err(FlashError::FinishFlash0)?;
 
-    for _ in 0..4 {
-        debug!("Finishing flashing (2/2)");
-        serial.write_all(query::finish_flash_1().as_bytes())?;
-    }
+    debug!("Finishing flashing (2/2)");
+    serial.write_all(query::finish_flash_1().as_bytes())?;
     // do not expect any reponse for the second finishing step
 
     Ok(())
@@ -402,10 +400,9 @@ mod test {
             .expect_write(&[0x02, 0x15, 0x55, 0x94])
             .respond(b"O")
             // no response expected for this, not sure if relevant
-            .expect_write(&[0x01, 0x0f, 0xf0])
-            .expect_write(&[0x01, 0x0f, 0xf0])
-            .expect_write(&[0x01, 0x0f, 0xf0])
-            .expect_write(&[0x01, 0x0f, 0xf0])
+            .expect_write(&[
+                0x01, 0x0f, 0xf0, 0x01, 0x0f, 0xf0, 0x01, 0x0f, 0xf0, 0x01, 0x0f, 0xf0,
+            ])
             .build();
 
         perform_flashing(&mut serial, 1, reader).expect("flashing should succeed here");

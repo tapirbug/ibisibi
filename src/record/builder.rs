@@ -3,6 +3,11 @@ use std::mem::take;
 
 pub struct Builder {
     data: Vec<u8>,
+    /// Position of the message being built.
+    ///
+    /// If non-zero, this is a builder for a multi-message record and the first
+    /// message is already finished.
+    build_idx: usize,
 }
 
 impl Builder {
@@ -11,6 +16,7 @@ impl Builder {
             data: vec![
                 0x00, // reserve this byte for the length, but set it to zero for now
             ],
+            build_idx: 0,
         }
     }
 
@@ -31,22 +37,61 @@ impl Builder {
         self
     }
 
-    /// Finishes the build, consuming the contents and leaving a fresh builder in place.
-    pub fn build(&mut self) -> Result<Record> {
-        let payload_len = if self.data.len() <= 0x100 {
-            (self.data.len() - 1) as u8
-        } else {
+    fn set_msg_len(&mut self) -> Result<&mut Self> {
+        let msg = &mut self.data[self.build_idx..];
+        debug_assert!(
+            !msg.is_empty(),
+            "Expected at least the length byte placeholder to be present"
+        );
+
+        let payload_len = msg.len() - 1;
+        let payload_len = if payload_len >= 0x100 {
             // Length (excluding length/checksum bytes) must fit in a single byte
             return Err(Error::RecordLengthOutOfBounds);
+        } else {
+            payload_len as u8
         };
+        // first byte is length, excluding both length byte itself and checksum
+        msg[0] = payload_len;
+        Ok(self)
+    }
 
-        let mut data = take(&mut self.data);
-        data[0] = payload_len; // first byte is length, excluding both length byte itself and checksum
-        data.push(checksum(&data));
+    // Adds the checksum, assuming that set_msg_len has already been called.
+    fn push_checksum(&mut self) -> &mut Self {
+        debug_assert!(
+            (self.data.len() - self.build_idx) >= 1,
+            "Expected at least the length to be present"
+        );
+        let checksum = checksum(&self.data[self.build_idx..]); // calculate checksum including length
+        self.data.push(checksum);
+        self
+    }
 
+    fn finish_msg(&mut self) -> Result<&mut Self> {
+        self.set_msg_len()?;
+        Ok(self.push_checksum())
+    }
+
+    /// Finishes this message and starts a new one in this record.
+    #[cfg(test)]
+    pub fn start_next(&mut self) -> Result<&mut Self> {
+        self.finish_msg()?;
+
+        // set next build idx and reserve a byte for the length of the next message
+        self.build_idx = self.data.len();
+        self.data.push(0x00); // byte is reserved for length of next message, set to zero for now
+
+        Ok(self)
+    }
+
+    /// Finishes the build, consuming the contents and leaving an empty builder in place.
+    pub fn build(&mut self) -> Result<Record> {
+        self.finish_msg()?;
+        let data = take(&mut self.data);
+        self.build_idx = 0;
         debug_assert!(
             data.len() >= 2,
-            "When constructed through new, assumed that the length is always 2 or more"
+            "When constructed through builder, assumed that the length is always 2 or more (length + checksum bytes and optional content)"
         );
         let record = Record { data };
         Ok(record)
@@ -73,6 +118,28 @@ mod test {
         assert_eq!(
             record.checksum(),
             BUF_EXPECTED_RESULT[BUF_EXPECTED_RESULT.len() - 1]
+        );
+    }
+
+    #[test]
+    fn build_multi_msg() {
+        let built = Builder::new()
+            .u8(0x0f)
+            .start_next()
+            .unwrap()
+            .u8(0x0f)
+            .start_next()
+            .unwrap()
+            .u8(0x0f)
+            .start_next()
+            .unwrap()
+            .u8(0x0f)
+            .build()
+            .unwrap();
+        assert_eq!(
+            built.as_bytes(),
+            &[0x01, 0x0f, 0xf0, 0x01, 0x0f, 0xf0, 0x01, 0x0f, 0xf0, 0x01, 0x0f, 0xf0],
+            "Unexpected byte pattern for multi-message sent after flashing has finished."
         );
     }
 }
