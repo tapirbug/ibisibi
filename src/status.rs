@@ -10,6 +10,7 @@ pub fn status(serial: &mut Serial, address: u8) -> Result<Status> {
 
     let telegram = Telegram::display_status(address);
     serial.write_all(telegram.as_bytes())?;
+    serial.flush()?;
 
     let mut response = [0_u8; 4];
     serial.read_exact(&mut response)?;

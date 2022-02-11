@@ -68,6 +68,7 @@ fn select_address(serial: &mut Serial, address: u8) -> Result<()> {
     serial.write_all(Telegram::empty().as_bytes())?;
     // r.S1 (select address?)
     serial.write_all(Telegram::bs_select_address(address).as_bytes())?;
+    serial.flush()?;
     // no response expected
     Ok(())
 }
@@ -78,12 +79,14 @@ fn clear_database(serial: &mut Serial) -> Result<()> {
 
     debug!("Preparing clearing (1/2)");
     serial.write_all(query::prepare_clear_0().as_bytes())?;
+    serial.flush()?;
     serial.read_exact(&mut buf[0..1])?;
     res::verify_ack_response(&buf[0..1]).map_err(FlashError::PrepareClear0)?;
 
     debug!("Preparing clearing (2/2)");
     const EXPECTED_QUERY_1_RESPONSE: &[u8] = &[0x57];
     serial.write_all(query::prepare_clear_1().as_bytes())?;
+    serial.flush()?;
     serial.read_exact(&mut buf[..])?;
     let unknown_query_1_response =
         res::response_payload(&buf[..]).map_err(FlashError::PrepareClear1CorruptResponse)?;
@@ -94,6 +97,7 @@ fn clear_database(serial: &mut Serial) -> Result<()> {
     for i in 0..4 {
         debug!("Clearing ({}/4)", i);
         serial.write_all(query::clear().as_bytes())?;
+        serial.flush()?;
         serial.read_exact(&mut buf[0..1])?;
         let response = buf[0];
         if response != b'E' {
@@ -103,11 +107,13 @@ fn clear_database(serial: &mut Serial) -> Result<()> {
 
     debug!("Finishing clearing (1/2)");
     serial.write_all(query::finish_clear_0().as_bytes())?;
+    serial.flush()?;
     serial.read_exact(&mut buf[0..1])?;
     res::verify_ack_response(&buf[0..1]).map_err(FlashError::FinishClear0)?;
 
     debug!("Finishing clearing (2/2)");
     serial.write_all(query::finish_clear_1().as_bytes())?;
+    serial.flush()?;
     serial.read_exact(&mut buf[0..1])?;
     res::verify_ack_response(&buf[0..1]).map_err(FlashError::FinishClear1)?;
 
@@ -137,6 +143,7 @@ fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
                         .map_err(FlashError::DbRecordTooLong)?
                         .as_bytes(),
                 )?;
+                serial.flush()?;
 
                 serial.read_exact(&mut buf)?;
                 res::verify_ack_response(&buf).map_err(FlashError::FlashChunkNotAcknowledged)?;
@@ -156,11 +163,13 @@ fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
 
     debug!("Finishing flashing (1/2)");
     serial.write_all(query::finish_flash_0().as_bytes())?;
+    serial.flush()?;
     serial.read_exact(&mut buf)?;
     res::verify_ack_response(&buf).map_err(FlashError::FinishFlash0)?;
 
     debug!("Finishing flashing (2/2)");
     serial.write_all(query::finish_flash_1().as_bytes())?;
+    serial.flush()?;
     // do not expect any reponse for the second finishing step
 
     Ok(())
