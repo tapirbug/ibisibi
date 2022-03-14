@@ -2,9 +2,10 @@ use crate::args::{Invocation, Run};
 use serde_yaml::from_reader;
 use std::fs::File;
 use thiserror::Error;
+use tracing::{event, Level};
 
 pub fn run(invocation: Invocation) -> Result<(), String> {
-    match invocation {
+    let result = match invocation {
         Invocation::Run(run) => run_yaml(run).map_err(|e| format!("{}", e)),
         Invocation::List(list) => crate::list::list(list).map_err(|e| format!("{}", e)),
         Invocation::Scan(scan) => crate::devices::scan(scan).map_err(|e| format!("{}", e)),
@@ -13,7 +14,11 @@ pub fn run(invocation: Invocation) -> Result<(), String> {
         }
         Invocation::Cycle(cycle) => crate::cycle::cycle(&cycle).map_err(|e| format!("{}", e)),
         Invocation::Flash(flash) => crate::flash::flash(flash).map_err(|e| format!("{}", e)),
+    };
+    if let Err(ref error) = result {
+        event!(Level::DEBUG, ?error, "Failure")
     }
+    result
 }
 
 fn run_yaml(opts: Run) -> Result<(), RunError> {

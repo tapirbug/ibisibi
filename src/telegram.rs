@@ -31,11 +31,7 @@ impl fmt::Display for Telegram {
         }
 
         let parity_byte = self.0[self.0.len() - 1];
-        write!(
-            f,
-            "<CR><P:{parity:X?}>",
-            parity = parity_byte
-        )
+        write!(f, "<CR><P:{parity:X?}>", parity = parity_byte)
     }
 }
 
@@ -140,11 +136,11 @@ impl Telegram {
 
     /// An empty IBIS telegram, consisting only of the terminating carriage return
     /// and a checksum of 0x72.
-    /// 
+    ///
     /// The effect of an empty message is not known, but it has been observed that
     /// this message is sent right before `bs_select_address` (in the same physical write).
     pub fn empty() -> Telegram {
-        Builder::with_msg_len(0).finish()   
+        Builder::with_msg_len(0).finish()
     }
 
     /// Command of unknown purpose that is sent before flashing a sign database to a
@@ -496,10 +492,7 @@ mod test {
     #[test]
     fn empty() {
         let telegram = Telegram::empty();
-        assert_eq!(
-            telegram.as_bytes(),
-            &[ 0x0d, 0x72 ]
-        );
+        assert_eq!(telegram.as_bytes(), &[0x0d, 0x72]);
         let telegram = &format!("{}", telegram);
         assert_eq!(telegram, "<CR><P:72>");
     }
@@ -507,23 +500,11 @@ mod test {
     #[test]
     fn select_address_1() {
         let telegram = Telegram::bs_select_address(1);
-        assert_eq!(
-            telegram.payload(),
-            &[0x1b, 0x53, 0x31]
-        );
-        assert_eq!(
-            telegram.as_bytes(),
-            &[0x1b, 0x53, 0x31, 0x0d, 0x0b]
-        );
+        assert_eq!(telegram.payload(), &[0x1b, 0x53, 0x31]);
+        assert_eq!(telegram.as_bytes(), &[0x1b, 0x53, 0x31, 0x0d, 0x0b]);
         let telegram_dbg = &format!("{:?}", telegram);
         let telegram_display = &format!("{}", telegram);
-        assert_eq!(
-            telegram_dbg,
-            "Telegram(\"\\u{1b}S1\\r\\u{b}\")"
-        );
-        assert_eq!(
-            telegram_display,
-            ".S1<CR><P:B>"
-        );
+        assert_eq!(telegram_dbg, "Telegram(\"\\u{1b}S1\\r\\u{b}\")");
+        assert_eq!(telegram_display, ".S1<CR><P:B>");
     }
 }

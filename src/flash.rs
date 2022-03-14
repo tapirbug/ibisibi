@@ -6,12 +6,13 @@ use crate::{
     telegram::Telegram,
 };
 use ihex::{Reader, Record};
+use std::backtrace::Backtrace;
 use std::{
     fs::read_to_string,
     io::{Read, Write},
 };
 use thiserror::Error;
-use tracing::{debug, warn};
+use tracing::{event, Level};
 
 pub type Result<T> = std::result::Result<T, FlashError>;
 
@@ -23,11 +24,13 @@ pub fn flash(opts: Flash) -> Result<()> {
         serial,
     } = opts;
 
+    event!(Level::DEBUG, "Opening serial port connection");
     let mut serial = serial::open(&serial).map_err(|e| FlashError::Serial {
         source: e,
         port: serial.clone(),
+        backtrace: Backtrace::capture()
     })?;
-    let db = read_to_string(sign_db_hex).map_err(FlashError::DbRead)?;
+    let db = read_to_string(sign_db_hex).map_err(FlashError::db_read)?;
     let db = Reader::new(&db);
 
     check_compatibility(&mut serial, address)?;
@@ -50,8 +53,9 @@ fn check_compatibility(serial: &mut Serial, address: u8) -> Result<()> {
 
 #[tracing::instrument(skip(serial))]
 fn dump_status(serial: &mut Serial, address: u8) -> Result<()> {
+    event!(Level::TRACE, "Checking device status");
     let status = status(serial, address)?;
-    debug!("Device status before starting flashing: {}", status);
+    event!(Level::DEBUG, %status, "Checked device status");
     Ok(())
 }
 
@@ -65,6 +69,7 @@ fn perform_flashing(serial: &mut Serial, address: u8, db: Reader) -> Result<()> 
 
 #[tracing::instrument(skip(serial))]
 fn select_address(serial: &mut Serial, address: u8) -> Result<()> {
+    event!(Level::DEBUG, "Selecting address for flashing");
     serial.write_all(Telegram::empty().as_bytes())?;
     // r.S1 (select address?)
     serial.write_all(Telegram::bs_select_address(address).as_bytes())?;
@@ -77,13 +82,14 @@ fn select_address(serial: &mut Serial, address: u8) -> Result<()> {
 fn clear_database(serial: &mut Serial) -> Result<()> {
     let mut buf = [0_u8; 4];
 
-    debug!("Preparing clearing (1/2)");
+    event!(Level::DEBUG, "Clearing database");
+    event!(Level::TRACE, "Preparing clearing (1/2)");
     serial.write_all(query::prepare_clear_0().as_bytes())?;
     serial.flush()?;
     serial.read_exact(&mut buf[0..1])?;
     res::verify_ack_response(&buf[0..1]).map_err(FlashError::PrepareClear0)?;
 
-    debug!("Preparing clearing (2/2)");
+    event!(Level::TRACE, "Preparing clearing (2/2)");
     const EXPECTED_QUERY_1_RESPONSE: &[u8] = &[0x57];
     serial.write_all(query::prepare_clear_1().as_bytes())?;
     serial.flush()?;
@@ -95,7 +101,7 @@ fn clear_database(serial: &mut Serial) -> Result<()> {
     }
 
     for i in 0..4 {
-        debug!("Clearing ({}/4)", i);
+        event!(Level::TRACE, "Clearing ({}/4)", i);
         serial.write_all(query::clear().as_bytes())?;
         serial.flush()?;
         serial.read_exact(&mut buf[0..1])?;
@@ -105,13 +111,13 @@ fn clear_database(serial: &mut Serial) -> Result<()> {
         }
     }
 
-    debug!("Finishing clearing (1/2)");
+    event!(Level::TRACE, "Finishing clearing (1/2)");
     serial.write_all(query::finish_clear_0().as_bytes())?;
     serial.flush()?;
     serial.read_exact(&mut buf[0..1])?;
     res::verify_ack_response(&buf[0..1]).map_err(FlashError::FinishClear0)?;
 
-    debug!("Finishing clearing (2/2)");
+    event!(Level::TRACE, "Finishing clearing (2/2)");
     serial.write_all(query::finish_clear_1().as_bytes())?;
     serial.flush()?;
     serial.read_exact(&mut buf[0..1])?;
@@ -122,6 +128,8 @@ fn clear_database(serial: &mut Serial) -> Result<()> {
 
 #[tracing::instrument(skip(serial, reader))]
 fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
+    event!(Level::DEBUG, "Flashing database");
+
     let mut buf = [0_u8; 1];
     let mut eof_found = false;
     let mut write_offset = 0;
@@ -132,7 +140,8 @@ fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
         }
         match record {
             Record::Data { value: data, .. } => {
-                debug!(
+                event!(
+                    Level::TRACE,
                     "Flashing {len} bytes at offset 0x{offset:X?}",
                     len = data.len(),
                     offset = write_offset
@@ -146,7 +155,7 @@ fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
                 serial.flush()?;
 
                 serial.read_exact(&mut buf)?;
-                res::verify_ack_response(&buf).map_err(FlashError::FlashChunkNotAcknowledged)?;
+                res::verify_ack_response(&buf).map_err(FlashError::flash_chunk_not_acknowledged)?;
 
                 write_offset += 0x20;
             }
@@ -158,19 +167,21 @@ fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
     }
 
     if !eof_found {
-        warn!("No EOF record found in database, ignoring");
+        event!(Level::WARN, "No EOF record found in database, ignoring");
     }
 
-    debug!("Finishing flashing (1/2)");
+    event!(Level::TRACE, "Finishing flashing (1/2)");
     serial.write_all(query::finish_flash_0().as_bytes())?;
     serial.flush()?;
     serial.read_exact(&mut buf)?;
     res::verify_ack_response(&buf).map_err(FlashError::FinishFlash0)?;
 
-    debug!("Finishing flashing (2/2)");
+    event!(Level::TRACE, "Finishing flashing (2/2)");
     serial.write_all(query::finish_flash_1().as_bytes())?;
     serial.flush()?;
     // do not expect any reponse for the second finishing step
+
+    event!(Level::TRACE, "Done flashing database");
 
     Ok(())
 }
@@ -178,7 +189,7 @@ fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
 #[derive(Debug, Error)]
 pub enum FlashError {
     #[error("Failed to read sign database, error: {0}")]
-    DbRead(std::io::Error),
+    DbRead(std::io::Error, Backtrace),
     #[error("Failed to read sign database, error: {0}")]
     DbCorrupt(#[from] ihex::ReaderError),
     #[error("Failed to read sign database, error: {0}")]
@@ -188,7 +199,7 @@ pub enum FlashError {
     )]
     DbUnexpectedRecordType,
     #[error("Database record sent, but device failed to send acknowledgement: {0}")]
-    FlashChunkNotAcknowledged(crate::record::Error),
+    FlashChunkNotAcknowledged(crate::record::Error, Backtrace),
     #[error(
         "Flashing could not be finished, unexpected repsonse from device at finsihing step 0: {0}"
     )]
@@ -197,11 +208,12 @@ pub enum FlashError {
     Serial {
         source: serialport::Error,
         port: String,
+        backtrace: Backtrace
     },
     #[error("Failed to write to serial port, error: {0}")]
-    SerialWrite(#[from] std::io::Error),
+    SerialWrite(#[from] std::io::Error, Backtrace),
     #[error("{0}")]
-    IbisResponseCorrupt(#[from] crate::telegram::TelegramParseError),
+    IbisResponseCorrupt(#[from] crate::telegram::TelegramParseError, Backtrace),
     #[error("Could not check device status before clearing and flashing, error: {0}")]
     Status(#[from] crate::status::Error),
     #[error("Could not clear sign database, unexpected response from device at clearing preparation step 0")]
@@ -216,6 +228,16 @@ pub enum FlashError {
     FinishClear0(crate::record::Error),
     #[error("Could not clear sign database, unexpected response from device at clearing finishing step 1, error: {0}")]
     FinishClear1(crate::record::Error),
+}
+
+impl FlashError {
+    fn db_read(io: std::io::Error) -> Self {
+        Self::DbRead(io, Backtrace::capture())
+    }
+
+    fn flash_chunk_not_acknowledged(error: crate::record::Error) -> Self {
+        Self::FlashChunkNotAcknowledged(error, Backtrace::capture())
+    }
 }
 
 #[cfg(test)]

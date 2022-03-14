@@ -1,5 +1,6 @@
+#![feature(backtrace)]
+
 use tracing::Level;
-use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 mod args;
 mod cycle;
@@ -19,11 +20,10 @@ mod status;
 mod telegram;
 
 fn main() -> Result<(), String> {
-    // a builder for `FmtSubscriber`.
-    let stderr = std::io::stderr
-        // all spans/events including TRACE will be written to stderr.
-        .with_max_level(Level::TRACE);
-    tracing_subscriber::fmt().with_writer(stderr).init();
+    tracing_subscriber::fmt()
+        .with_max_level(Level::TRACE)
+        .with_writer(std::io::stderr)
+        .init();
 
     let args: args::TopLevel = argh::from_env();
     run::run(args.invocation)
