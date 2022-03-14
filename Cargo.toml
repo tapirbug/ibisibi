@@ -10,8 +10,8 @@ lazy_static = "1.4.0"
 serde_yaml = "0.8.23"
 serialport = "4.0.1"
 thiserror = "1.0.30"
-tracing = "0.1.30"
-tracing-subscriber = "0.3.8"
+tracing = "0.1.32"
+tracing-subscriber = "0.3.9"
 
 [dependencies.chrono]
 version = "0.4.19"
