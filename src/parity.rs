@@ -25,7 +25,7 @@ mod test {
         let parity = parity_byte(&[b'\r']);
         assert_eq!(
             parity, 0x72,
-            "Unexpected checksum of message consisiting only of terminating CR, got: {:X?}",
+            "Unexpected checksum of message consisting only of terminating CR, got: {:X?}",
             parity
         )
     }
