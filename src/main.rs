@@ -20,6 +20,8 @@ mod status;
 mod telegram;
 
 fn main() -> Result<(), String> {
+    std::env::set_var("RUST_BACKTRACE", "1"); // always enable backtraces
+
     tracing_subscriber::fmt()
         .with_max_level(Level::TRACE)
         .with_writer(std::io::stderr)
