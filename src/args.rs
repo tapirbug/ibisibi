@@ -76,6 +76,24 @@ pub struct Flash {
     /// serial port to use, e.g. /dev/ttyUSB0 on Linux, or COM5 on Windows.
     #[argh(option, short = 's')]
     pub serial: String,
+    /// the receive timeout.
+    #[argh(option, short = 't', default = "5")]
+    pub timeout: u64,
+    /// data bits as any of 5, 6, 7, 8
+    #[argh(option, default = "7")]
+    pub data_bits: u8,
+    /// stop bits as any of 1, 2
+    #[argh(option, default = "2")]
+    pub stop_bits: u8,
+    /// parity as e (even) or o (odd) or n (none)
+    #[argh(option, default = "'e'")]
+    pub parity: char,
+    /// baudrate
+    #[argh(option, default = "1200")]
+    pub baudrate: u32,
+    /// flow control as s (software) or h (hardware) or n (none)
+    #[argh(option, default = "'n'")]
+    pub flow_control: char,
 }
 
 /// Loop through the given destination indexes in regular intervals.

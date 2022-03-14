@@ -18,14 +18,14 @@ pub type Result<T> = std::result::Result<T, FlashError>;
 
 #[tracing::instrument]
 pub fn flash(opts: Flash) -> Result<()> {
+    event!(Level::DEBUG, "Opening serial port connection");
     let Flash {
         address,
-        sign_db_hex,
-        serial,
+        ref sign_db_hex,
+        ref serial,
+        ..
     } = opts;
-
-    event!(Level::DEBUG, "Opening serial port connection");
-    let mut serial = serial::open(&serial).map_err(|e| FlashError::Serial {
+    let mut serial = serial::open_for_flashing(&opts).map_err(|e| FlashError::Serial {
         source: e,
         port: serial.clone(),
         backtrace: Backtrace::capture()
