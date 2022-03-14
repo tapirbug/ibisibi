@@ -188,7 +188,7 @@ fn flash_database(serial: &mut Serial, reader: Reader) -> Result<()> {
 
 #[derive(Debug, Error)]
 pub enum FlashError {
-    #[error("Failed to read sign database, error: {0}")]
+    #[error("Failed to read sign database, error: {0}, backtrace: {1}")]
     DbRead(std::io::Error, Backtrace),
     #[error("Failed to read sign database, error: {0}")]
     DbCorrupt(#[from] ihex::ReaderError),
@@ -198,21 +198,21 @@ pub enum FlashError {
         "Failed to read sign database, error: unrecognized format, found unexpected record type"
     )]
     DbUnexpectedRecordType,
-    #[error("Database record sent, but device failed to send acknowledgement: {0}")]
+    #[error("Database record sent, but device failed to send acknowledgement: {0}, backtrace: {1}")]
     FlashChunkNotAcknowledged(crate::record::Error, Backtrace),
     #[error(
         "Flashing could not be finished, unexpected repsonse from device at finsihing step 0: {0}"
     )]
     FinishFlash0(crate::record::Error),
-    #[error("Could not open serial port connection to: {port}, due to error: {source}")]
+    #[error("Could not open serial port connection to: {port}, due to error: {source}, backtrace: {backtrace}")]
     Serial {
         source: serialport::Error,
         port: String,
         backtrace: Backtrace
     },
-    #[error("Failed to write to serial port, error: {0}")]
+    #[error("Failed to write to serial port, error: {0}, backtrace: {1}")]
     SerialWrite(#[from] std::io::Error, Backtrace),
-    #[error("{0}")]
+    #[error("{0}, backtrace: {1}")]
     IbisResponseCorrupt(#[from] crate::telegram::TelegramParseError, Backtrace),
     #[error("Could not check device status before clearing and flashing, error: {0}")]
     Status(#[from] crate::status::Error),
