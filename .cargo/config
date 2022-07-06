@@ -7,3 +7,6 @@ rustflags = [
     "--verbose",
     "-C", "link-args=-Wl,-rpath,../vendor/arm-unknown-linux-gnueabihf/libudev/lib/arm-linux-gnueabihf",
 ]
+
+[target.aarch64-unknown-linux-musl]
+linker = "aarch64-linux-gnu-gcc"

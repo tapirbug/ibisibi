@@ -15,7 +15,8 @@ cd $(cd -P -- "$(dirname -- "$0")" && pwd -P) && \
 
 # And build for CROSS_TRIPLE
 RELEASE_DIR_NAME=$(./build.sh $CROSS_TRIPLE)
-if test -z $RELEASE_DIR; then
+RELEASE_DIR="release/$RELEASE_DIR_NAME"
+if test -z $RELEASE_DIR_NAME; then
   echo -e "Build failed, exiting..."
   exit 1
 fi
