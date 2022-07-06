@@ -1,6 +1,6 @@
 use serialport::Result;
 #[cfg(not(test))]
-use serialport::{new, DataBits, Parity, StopBits, FlowControl};
+use serialport::{new, DataBits, FlowControl, Parity, StopBits};
 #[cfg(not(test))]
 use std::time::Duration;
 use std::{borrow::Cow, convert::Into};
@@ -41,40 +41,38 @@ where
 }
 
 #[cfg(not(test))]
-pub fn open_for_flashing(flash: &crate::args::Flash) -> Result<Serial>
-{
+pub fn open_for_flashing(flash: &crate::args::Flash) -> Result<Serial> {
     new(&flash.serial, flash.baudrate)
         .data_bits(match flash.data_bits {
             5 => DataBits::Five,
             6 => DataBits::Six,
             7 => DataBits::Seven,
             8 => DataBits::Eight,
-            other => panic!("{} data bits not supported", other)
+            other => panic!("{} data bits not supported", other),
         })
         .stop_bits(match flash.stop_bits {
             1 => StopBits::One,
             2 => StopBits::Two,
-            other => panic!("{} stop bits not supported", other)
+            other => panic!("{} stop bits not supported", other),
         })
         .parity(match flash.parity {
             'e' => Parity::Even,
             'o' => Parity::Odd,
             'n' => Parity::None,
-            other => panic!("{} is not a supported parity", other)
+            other => panic!("{} is not a supported parity", other),
         })
         .timeout(Duration::new(flash.timeout, 0))
         .flow_control(match flash.flow_control {
             's' => FlowControl::Software,
             'h' => FlowControl::Hardware,
             'n' => FlowControl::None,
-            other => panic!("{} is not a supported value for --flow-control", other)
+            other => panic!("{} is not a supported value for --flow-control", other),
         })
         .open()
 }
 
 #[cfg(test)]
-pub fn open_for_flashing(_flash: &crate::args::Flash) -> Result<Serial>
-{
+pub fn open_for_flashing(_flash: &crate::args::Flash) -> Result<Serial> {
     todo!("mocking of open_for_flashing function for test currently not needed")
 }
 

@@ -28,7 +28,7 @@ pub fn flash(opts: Flash) -> Result<()> {
     let mut serial = serial::open_for_flashing(&opts).map_err(|e| FlashError::Serial {
         source: e,
         port: serial.clone(),
-        backtrace: Backtrace::capture()
+        backtrace: Backtrace::capture(),
     })?;
     let db = read_to_string(sign_db_hex).map_err(FlashError::db_read)?;
     let db = Reader::new(&db);
@@ -198,7 +198,9 @@ pub enum FlashError {
         "Failed to read sign database, error: unrecognized format, found unexpected record type"
     )]
     DbUnexpectedRecordType,
-    #[error("Database record sent, but device failed to send acknowledgement: {0}, backtrace: {1}")]
+    #[error(
+        "Database record sent, but device failed to send acknowledgement: {0}, backtrace: {1}"
+    )]
     FlashChunkNotAcknowledged(crate::record::Error, Backtrace),
     #[error(
         "Flashing could not be finished, unexpected repsonse from device at finsihing step 0: {0}"
@@ -208,7 +210,7 @@ pub enum FlashError {
     Serial {
         source: serialport::Error,
         port: String,
-        backtrace: Backtrace
+        backtrace: Backtrace,
     },
     #[error("Failed to write to serial port, error: {0}, backtrace: {1}")]
     SerialWrite(#[from] std::io::Error, Backtrace),
